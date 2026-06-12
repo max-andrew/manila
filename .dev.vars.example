@@ -10,6 +10,8 @@ DYNAMIC_ENV_ID=
 
 # Unlink — sealed (confidential) transfers on Arc
 UNLINK_API_KEY=
+# Treasury's private-account mnemonic (printed by scripts/setup-unlink.mjs)
+TREASURY_UNLINK_MNEMONIC=
 
 # Arc testnet
 ARC_RPC_URL=
