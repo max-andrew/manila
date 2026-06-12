@@ -1,0 +1,19 @@
+# Copy to .dev.vars for local dev; set in prod with `wrangler secret put <NAME>`.
+# .dev.vars is gitignored — never commit real values.
+
+# Anthropic — agent brain (claude-sonnet-4-6 tool-use)
+ANTHROPIC_API_KEY=
+
+# Dynamic — server wallet / delegated access for the agent
+DYNAMIC_API_KEY=
+DYNAMIC_ENV_ID=
+
+# Unlink — sealed (confidential) transfers on Arc
+UNLINK_API_KEY=
+
+# Arc testnet
+ARC_RPC_URL=
+
+# Treasury (Dynamic server wallet id/address, filled in during M1)
+TREASURY_WALLET_ID=
+TREASURY_WALLET_ADDRESS=

@@ -1,0 +1,22 @@
+{
+  "name": "manila",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The pay envelope, rebuilt onchain. Confidential, agent-operated USDC payroll on Arc.",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "types": "wrangler types",
+    "db:migrate:local": "wrangler d1 migrations apply manila --local",
+    "db:migrate:remote": "wrangler d1 migrations apply manila --remote",
+    "db:seed:local": "wrangler d1 execute manila --local --file ./db/seed.sql",
+    "db:seed:remote": "wrangler d1 execute manila --remote --file ./db/seed.sql"
+  },
+  "dependencies": {
+    "hono": "^4"
+  },
+  "devDependencies": {
+    "typescript": "^5",
+    "wrangler": "^4"
+  }
+}
