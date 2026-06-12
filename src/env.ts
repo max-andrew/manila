@@ -10,6 +10,8 @@ export type Env = {
   ARC_RPC_URL: string;
   TREASURY_WALLET_ID: string;
   TREASURY_WALLET_ADDRESS: string;
+  // Platform fee collector for the $0.001-per-disbursement x402 nanopayments:
+  SEAL_FEE_ADDRESS: string;
   // Node sidecar that holds the Dynamic MPC SDK (native binary, can't run in workerd):
   SIGNER_SIDECAR_URL: string;
   SIGNER_SIDECAR_SECRET: string;

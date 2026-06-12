@@ -19,6 +19,8 @@ ARC_RPC_URL=
 # Treasury (Dynamic server wallet id/address, filled in during M1)
 TREASURY_WALLET_ID=
 TREASURY_WALLET_ADDRESS=
+# Receives the $0.001 x402 seal fee per disbursement (any plain address)
+SEAL_FEE_ADDRESS=
 
 # Signing sidecar (Node process running the Dynamic MPC SDK; see sidecar/server.mjs)
 SIGNER_SIDECAR_URL=http://localhost:8901
