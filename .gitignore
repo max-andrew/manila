@@ -4,3 +4,4 @@ node_modules/
 dist/
 .DS_Store
 worker-configuration.d.ts
+sidecar/.wallet.json

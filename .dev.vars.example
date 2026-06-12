@@ -17,3 +17,9 @@ ARC_RPC_URL=
 # Treasury (Dynamic server wallet id/address, filled in during M1)
 TREASURY_WALLET_ID=
 TREASURY_WALLET_ADDRESS=
+
+# Signing sidecar (Node process running the Dynamic MPC SDK; see sidecar/server.mjs)
+SIGNER_SIDECAR_URL=http://localhost:8901
+SIGNER_SIDECAR_SECRET=
+SIDECAR_WALLET_PASSWORD=
+SIDECAR_PORT=8901
