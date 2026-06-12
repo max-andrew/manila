@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Manila — the pay envelope, rebuilt onchain</title>
+<style>
+  :root {
+    --manila: #E0BE7E;   /* kraft — sealed badges + approval banner only */
+    --ink:    #1F2430;   /* structural text and borders */
+    --stamp:  #C0392B;   /* reserved for blocked / pending / over-policy */
+    --paper:  #FAF6EE;   /* page background */
+    --khaki:  #6B6253;   /* secondary text */
+    --mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+    --sans: -apple-system, 'Helvetica Neue', Arial, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--paper); color: var(--ink); font-family: var(--sans); padding: 2rem; }
+  header { display: flex; align-items: baseline; gap: 1rem; margin-bottom: 0.4rem; }
+  h1 { font-size: 1.5rem; letter-spacing: 0.02em; }
+  .tagline { color: var(--khaki); font-size: 0.9rem; }
+  main { display: grid; grid-template-columns: 1fr 1.3fr 1.3fr; gap: 1rem; margin-top: 1.5rem; }
+  section { border: 1.5px solid var(--ink); background: #fff; padding: 1rem; min-height: 18rem; }
+  section h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.12em;
+               border-bottom: 1.5px solid var(--ink); padding-bottom: 0.5rem; margin-bottom: 0.75rem; }
+  .num, .mono, table, #chat-log { font-family: var(--mono); }
+  .muted { color: var(--khaki); }
+  table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
+  th, td { text-align: left; padding: 0.35rem 0.5rem; border-bottom: 1px solid #e5dfd2; }
+  th { color: var(--khaki); font-weight: 500; }
+  .badge { font-family: var(--mono); font-size: 0.68rem; letter-spacing: 0.14em; padding: 0.15rem 0.45rem; }
+  .badge.sealed { background: var(--manila); color: var(--khaki); transform: rotate(-1.5deg); display: inline-block; }
+  .badge.pending { color: var(--stamp); border: 1.5px solid var(--stamp); }
+  .badge.released { color: #fff; background: var(--ink); }
+  #treasury-balance { font-size: 1.8rem; margin: 0.5rem 0; }
+  footer { margin-top: 1.5rem; color: var(--khaki); font-size: 0.75rem; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Manila</h1>
+  <span class="tagline">The pay envelope, rebuilt onchain.</span>
+</header>
+
+<main>
+  <section id="treasury">
+    <h2>Treasury</h2>
+    <div id="treasury-balance" class="num muted">—</div>
+    <div class="muted" style="font-size:0.8rem">USDC on Arc testnet</div>
+    <table id="employees" style="margin-top:1rem">
+      <thead><tr><th>Employee</th><th>Salary</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
+  <section id="agent">
+    <h2>Agent</h2>
+    <div id="chat-log" class="muted" style="font-size:0.8rem">Awaiting instructions.</div>
+  </section>
+
+  <section id="audit">
+    <h2>Audit</h2>
+    <table id="audit-table">
+      <thead><tr><th>When</th><th>Actor</th><th>Action</th><th>Result</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </section>
+</main>
+
+<footer class="mono" id="status">connecting…</footer>
+
+<script>
+const usd = (micro) => '$' + (Number(micro) / 1e6).toLocaleString('en-US', { minimumFractionDigits: 2 });
+
+async function load() {
+  try {
+    const [health, employees, audit] = await Promise.all([
+      fetch('/api/health').then(r => r.json()),
+      fetch('/api/employees').then(r => r.json()),
+      fetch('/api/audit').then(r => r.json()),
+    ]);
+    document.getElementById('status').textContent = health.ok ? 'manila · connected' : 'service degraded';
+
+    document.querySelector('#employees tbody').innerHTML = employees
+      .map(e => `<tr><td>${e.name}</td><td class="num">${usd(e.salary_micro)}</td></tr>`)
+      .join('');
+
+    document.querySelector('#audit-table tbody').innerHTML = audit.length
+      ? audit.map(a => `<tr><td>${a.created_at}</td><td>${a.actor}</td><td>${a.action}</td>
+          <td>${a.policy_result ?? ''}</td></tr>`).join('')
+      : '<tr><td colspan="4" class="muted">No entries yet.</td></tr>';
+  } catch (err) {
+    document.getElementById('status').textContent = 'error: ' + err.message;
+  }
+}
+load();
+</script>
+</body>
+</html>
