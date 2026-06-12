@@ -1,0 +1,8 @@
+// Temporary config for the M1 SDK compatibility probe. Deleted after M1.
+{
+  "name": "manila-probe",
+  "main": "src/probe-entry.ts",
+  "compatibility_date": "2026-06-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false
+}
