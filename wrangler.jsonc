@@ -4,6 +4,12 @@
   "main": "src/index.ts",
   "compatibility_date": "2026-06-01",
   "compatibility_flags": ["nodejs_compat"],
+  // @unlink-xyz/sdk maps its /admin entry to null under browser export
+  // conditions (admin keys must not ship to browsers). This is a server-side
+  // Worker, so point straight at the module.
+  "alias": {
+    "@unlink-xyz/sdk/admin": "./node_modules/@unlink-xyz/sdk/dist/admin/index.js"
+  },
   "assets": { "directory": "./public", "binding": "ASSETS" },
   "d1_databases": [
     {
