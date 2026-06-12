@@ -6,6 +6,7 @@ export type Env = {
   DYNAMIC_API_KEY: string;
   DYNAMIC_ENV_ID: string;
   UNLINK_API_KEY: string;
+  TREASURY_UNLINK_MNEMONIC: string;
   ARC_RPC_URL: string;
   TREASURY_WALLET_ID: string;
   TREASURY_WALLET_ADDRESS: string;
