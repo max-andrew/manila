@@ -1,11 +1,5 @@
 import { Hono } from 'hono';
-
-type Env = {
-  DB: D1Database;
-  ASSETS: Fetcher;
-  // Secrets (set via .dev.vars locally, wrangler secret put in prod):
-  // ANTHROPIC_API_KEY, DYNAMIC_API_KEY, DYNAMIC_ENV_ID, UNLINK_API_KEY, ARC_RPC_URL
-};
+import type { Env } from './env';
 
 const app = new Hono<{ Bindings: Env }>();
 
