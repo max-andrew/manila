@@ -17,6 +17,7 @@
     "@circle-fin/x402-batching": "^3.0.4",
     "@dynamic-labs-wallet/node-evm": "^1.0.38",
     "@unlink-xyz/sdk": "^0.3.0-canary.598",
+    "@x402/evm": "^2.14.0",
     "hono": "^4",
     "viem": "^2.52.2"
   },

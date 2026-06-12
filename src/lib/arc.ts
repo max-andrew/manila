@@ -11,7 +11,9 @@ export const arcTestnet = (rpcUrl?: string) =>
   defineChain({
     id: ARC_TESTNET_CHAIN_ID,
     name: 'Arc Testnet',
-    nativeCurrency: { name: 'USDC', symbol: 'USDC', decimals: 6 },
+    // Native-currency decimals are 18 (matches Circle's CHAIN_CONFIGS.arcTestnet);
+    // the USDC ERC-20 interface at ARC_USDC_ADDRESS is 6.
+    nativeCurrency: { name: 'USDC', symbol: 'USDC', decimals: 18 },
     rpcUrls: { default: { http: [rpcUrl ?? ARC_DEFAULT_RPC] } },
     blockExplorers: { default: { name: 'ArcScan', url: ARC_EXPLORER } },
     testnet: true,

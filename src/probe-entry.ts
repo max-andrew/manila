@@ -35,9 +35,30 @@ export default {
       results['unlink-exports'] = Object.keys(mod).slice(0, 12).join(',');
     });
 
-    await probe('gateway', async () => {
-      const mod = await import('@circle-fin/x402-batching');
-      results['gateway-exports'] = Object.keys(mod).slice(0, 12).join(',');
+    await probe('gateway-client', async () => {
+      const { GatewayClient, registerBatchScheme, CHAIN_CONFIGS } = await import(
+        '@circle-fin/x402-batching/client'
+      );
+      if (!GatewayClient || !registerBatchScheme) throw new Error('missing exports');
+      results['arc-config'] = JSON.stringify(CHAIN_CONFIGS.arcTestnet ?? null);
+      const { generatePrivateKey } = await import('viem/accounts');
+      // construct with a throwaway key to catch constructor-time Node deps
+      new GatewayClient({ chain: 'arcTestnet', privateKey: generatePrivateKey() });
+    });
+
+    await probe('gateway-server', async () => {
+      const mod = await import('@circle-fin/x402-batching/server');
+      results['gateway-server-exports'] = Object.keys(mod).slice(0, 12).join(',');
+    });
+
+    await probe('x402-core-client', async () => {
+      const mod = await import('@x402/core/client');
+      results['x402-client-exports'] = Object.keys(mod).slice(0, 12).join(',');
+    });
+
+    await probe('x402-core-server', async () => {
+      const mod = await import('@x402/core/server');
+      results['x402-server-exports'] = Object.keys(mod).slice(0, 12).join(',');
     });
 
     return Response.json(results);

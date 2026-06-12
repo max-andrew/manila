@@ -11,24 +11,34 @@ For a century, salaries were private because they came in a sealed manila envelo
 
 ```mermaid
 flowchart LR
-  Employer -->|fund: any token via Flow| Treasury["Treasury\n(Dynamic server wallet)"]
-  Employer -->|plain-English command| Agent["Agent\n(Claude, tool use)"]
-  Agent --> Policy["Policy engine\ncap + allowlist"]
-  Policy -->|pass| Disburse["Circle Gateway\nbatched micro-settlement"]
-  Policy -->|over policy| Approval["Pending approval\n(maker-checker)"]
-  Approval -->|second signature| Disburse
-  Treasury --> Disburse
-  Disburse --> Unlink["Unlink\nsealed transfer on Arc"]
+  Employer -->|plain-English command| Agent["Agent (Claude tool use,
+  Cloudflare Worker)"]
+  Agent --> Policy["Policy engine
+  cap + allowlist"]
+  Policy -->|over policy| Approval["Pending approval
+  (maker-checker)"]
+  Approval -->|second signature| Seal
+  Policy -->|pass| Seal["Seal service
+  (402-protected, per employee)"]
+  Agent -->|x402 nanopayment per disbursement| Seal
+  Sidecar["Signing sidecar (Node)
+  Dynamic server wallet, MPC"] -->|signs payment authorizations| Agent
+  Seal -->|batched micro-settlement| Gateway["Circle Gateway
+  netted settlement on Arc"]
+  Seal -->|sealed salary transfer| Unlink["Unlink private account
+  amounts + counterparties hidden"]
   Unlink --> Employees
   Agent --> Audit["Audit log → CSV export"]
-  Disburse --> Audit
+  Seal --> Audit
 ```
+
+Two legs per payroll run. The **value leg** is sealed: salaries move as Unlink private transfers — amounts and counterparties unreadable on ArcScan. The **nanopayment leg** is the meter: the agent pays a $0.001 x402 micropayment per disbursement to the seal service, each authorization signed by the Dynamic server wallet (the agent holds no keys), all of them netted by Circle Gateway into one batched, gas-free settlement on Arc. No payment, no seal: every sponsor integration is load-bearing.
 
 ## How we use each sponsor
 
 *(Filled in per milestone — each subsection states what the integration does here, why the product breaks without it, and file/line pointers.)*
 
-- **Dynamic** — server wallet with delegated access; the agent holds no keys, it requests signatures under policy. *(M1)*
+- **Dynamic** — server wallet (MPC) in a Node sidecar (`sidecar/server.mjs`; the SDK's native MPC binary can't run in workerd). The Worker requests signatures over an authenticated channel (`src/lib/signer.ts`); the agent itself never holds key material. *(M1)*
 - **Unlink** — every disbursement is sealed; amounts and counterparties unreadable on the explorer. *(M1)*
 - **Circle Gateway / Arc** — batched gas-free USDC micro-settlement on Arc testnet. *(M1)*
 - **Dynamic Flow** — fund the treasury with any supported token, settle USDC. *(M4)*
