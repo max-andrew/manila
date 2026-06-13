@@ -71,6 +71,10 @@
   /* treasury */
   #treasury-balance { font-family: var(--mono); font-size: 2.1rem; letter-spacing: -.01em; margin: .1rem 0 .15rem; }
   #treasury-sub { font-size: .78rem; }
+  #nano-balance { margin-top: .85rem; }
+  #nano-balance .lbl { font-size: .64rem; text-transform: uppercase; letter-spacing: .1em; color: var(--khaki); }
+  #nano-balance .amt { font-family: var(--mono); font-size: 1.05rem; color: var(--ink); }
+  #nano-balance .sub { font-size: .68rem; color: var(--khaki); }
   table { width: 100%; border-collapse: collapse; font-size: .8rem; margin-top: 1rem; }
   th, td { text-align: left; padding: .4rem .15rem; border-bottom: 1px solid var(--line); }
   th { color: var(--khaki); font-weight: 500; font-size: .68rem; text-transform: uppercase; letter-spacing: .08em; }
@@ -169,7 +173,8 @@
     <section class="card" id="treasury">
       <h2>Treasury</h2>
       <div id="treasury-balance" class="muted">—</div>
-      <div id="treasury-sub" class="muted">sealed USDC on Arc testnet</div>
+      <div id="treasury-sub" class="muted">sealed payroll balance · private USDC</div>
+      <div id="nano-balance"></div>
       <div id="treasury-links" class="explorer-links"></div>
       <table id="employees">
         <thead><tr><th>Employee</th><th style="text-align:right">Per day</th></tr></thead>
@@ -178,7 +183,7 @@
     </section>
 
     <section class="card" id="agent">
-      <h2>Agent <span class="mode" title="The agent runs payroll on demand right now. The same flow can run on a schedule via a Cloudflare Cron Trigger (or a per-employer Durable Object alarm) — hands-off daily payroll, kept safe by the policy controls."><span class="d">●</span> Manual mode</span></h2>
+      <h2>Agent <span class="mode" title="Run on demand, or automate with a Cloudflare Cron Trigger for hands-off daily payroll."><span class="d">●</span> Manual mode</span></h2>
       <div id="approval-banner" hidden></div>
       <div id="chat-log"><div class="placeholder">Tell the agent to run today's payroll. It drafts the run, checks policy, and seals it — or holds for approval, or refuses.</div></div>
       <div class="chips" id="chips">
@@ -191,7 +196,7 @@
         <input id="chat-input" type="text" placeholder="Run today's payroll" />
         <button type="submit" id="chat-send">Send</button>
       </form>
-      <p class="agent-foot">Running in <b>manual mode</b>. Flip on a daily <b>Cloudflare Cron Trigger</b> and the same agent runs payroll every morning, hands-off — safe to leave unattended because the policy controls can't be talked past, and an over-cap run still waits for your signature.</p>
+      <p class="agent-foot">Manual today — a <b>Cloudflare Cron Trigger</b> can run it daily, hands-off.</p>
     </section>
 
     <section class="card" id="audit">
@@ -253,9 +258,11 @@ async function load() {
     if (treasury?.sealed?.available) {
       el('treasury-balance').textContent = '$' + treasury.sealed.formatted;
       el('treasury-balance').classList.remove('muted');
-      el('treasury-sub').textContent =
-        'sealed USDC' + (treasury.fees?.available ? ` · $${treasury.fees.formatted} nanopayment balance` : ' on Arc testnet');
+      el('treasury-sub').textContent = 'sealed payroll balance · private USDC';
     }
+    el('nano-balance').innerHTML = treasury?.fees?.available
+      ? `<div class="lbl">Nanopayment balance</div><div><span class="amt">$${treasury.fees.formatted}</span> <span class="sub">· gas-free seal fees</span></div>`
+      : '';
     const addr = treasury?.treasury_address;
     el('treasury-links').innerHTML = [
       addr ? `<a href="${ARCSCAN}/address/${addr}" target="_blank" rel="noopener" title="${addr}">Treasury wallet&nbsp;↗</a>` : '',
@@ -266,9 +273,18 @@ async function load() {
       .map(e => `<tr><td>${esc(e.name)}</td><td class="amt" style="text-align:right">${usd(e.salary_micro)}</td></tr>`)
       .join('');
 
+    // Each disbursement row links to that employee's sealed transfer on Arc.
+    const empName = {};
+    employees.forEach(e => { empName[e.id] = e.name; });
+    const action = (a) => {
+      if (a.action === 'disburse') {
+        try { const d = JSON.parse(a.detail || '{}'); if (empName[d.employee]) return `seal · ${esc(empName[d.employee])}`; } catch {}
+      }
+      return esc(a.action);
+    };
     document.querySelector('#audit-table tbody').innerHTML = audit.length
       ? audit.map(a => `<tr><td class="muted">${esc((a.created_at||'').slice(5,16))}</td><td>${esc(a.actor)}</td>
-          <td>${esc(a.action)}</td><td>${policyBadge(a.policy_result)}</td>
+          <td>${action(a)}</td><td>${policyBadge(a.policy_result)}</td>
           <td class="seal">${sealCell(a.tx_refs)}</td></tr>`).join('')
       : '<tr><td colspan="5" class="muted">No entries yet.</td></tr>';
 
