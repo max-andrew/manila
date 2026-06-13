@@ -69,15 +69,26 @@ npm run dev                        # http://localhost:8788
 
 The agent panel works immediately on this alone — type **"Run June payroll with a 25% bonus"** and watch it draft the run, fail the policy cap, and route it for a second signature; click **Add second signature** to release. Then **Open the envelope** exports the full audit trail as CSV.
 
-To exercise the live money path (real Arc testnet settlement), add sponsor credentials and bring up the signer + private accounts:
+To exercise the live money path (real Arc testnet settlement), add sponsor credentials and bring up the signer, private accounts, and Gateway balance. `GET /api/status` is a live readiness preflight — watch it go green as you complete each step.
 
 ```sh
-cp .dev.vars.example .dev.vars     # DYNAMIC_API_KEY/ENV_ID, UNLINK_API_KEY, SEAL_FEE_ADDRESS…
-node sidecar/server.mjs            # prints the treasury address → fund at faucet.circle.com (Arc Testnet)
-node scripts/setup-unlink.mjs      # creates + registers the Unlink accounts, prints the D1 updates to apply
-# deploy:
-npm run db:migrate:remote && npm run db:seed:remote && npm run deploy
+cp .dev.vars.example .dev.vars     # DYNAMIC_API_KEY/ENV_ID, UNLINK_API_KEY, SEAL_FEE_ADDRESS,
+                                   # SIGNER_SIDECAR_SECRET + SIDECAR_WALLET_PASSWORD (any random strings)
+
+# 1. Treasury wallet — the Dynamic MPC server wallet, in its Node sidecar.
+node sidecar/server.mjs            # prints the treasury address; copy it into .dev.vars as TREASURY_WALLET_ADDRESS
+
+# 2. Private accounts — treasury + employees on Unlink.
+node scripts/setup-unlink.mjs      # registers the accounts, faucets the treasury's private balance,
+                                   # prints the D1 UPDATEs to apply and TREASURY_UNLINK_MNEMONIC for .dev.vars
+
+# 3. Nanopayment balance — fund the treasury's Gateway balance for the seal fees.
+node scripts/fund-gateway.mjs      # prints an ops address → faucet it (faucet.circle.com, Arc Testnet) → re-run
+
+curl localhost:8788/api/status     # m1_ready: true when all of the above is wired
 ```
+
+Once green, "Run the June payroll" seals three real private transfers on Arc, settled gas-free via one batched Gateway settlement. (The Arc faucet grants 20 USDC per address per 2h; fund early.)
 
 ## Prize entries
 
