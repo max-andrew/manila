@@ -4,6 +4,7 @@ import { sealApp } from './routes/seal';
 import { disburseApp } from './routes/disburse';
 import { agentApp } from './routes/agent';
 import { statusApp } from './routes/status';
+import { treasuryApp } from './routes/treasury';
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -38,6 +39,7 @@ app.route('/api', sealApp);
 app.route('/api', disburseApp);
 app.route('/api', agentApp);
 app.route('/api', statusApp);
+app.route('/api', treasuryApp);
 
 app.onError((err, c) => {
   console.error(err);
