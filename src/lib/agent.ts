@@ -205,11 +205,21 @@ export async function setExecutingAndRun(env: Env, runId: number) {
   return executeRun(env, runId);
 }
 
+// Has this period already been paid? Guards against double-paying a day.
+async function alreadyPaid(env: Env, period: string, excludeRunId: number): Promise<boolean> {
+  const row = await env.DB.prepare(
+    "SELECT id FROM payroll_runs WHERE period = ? AND status = 'sealed' AND id != ? LIMIT 1"
+  )
+    .bind(period, excludeRunId)
+    .first();
+  return !!row;
+}
+
 async function executeRunTool(env: Env, args: ToolResult): Promise<ToolResult> {
   const runId = Number(args.run_id);
-  const run = await env.DB.prepare('SELECT policy_result, custom_recipient FROM payroll_runs WHERE id = ?')
+  const run = await env.DB.prepare('SELECT period, policy_result, custom_recipient FROM payroll_runs WHERE id = ?')
     .bind(runId)
-    .first<{ policy_result: string | null; custom_recipient: string | null }>();
+    .first<{ period: string; policy_result: string | null; custom_recipient: string | null }>();
   if (!run) throw new Error(`run ${runId} not found`);
   const policy = run.policy_result ? (JSON.parse(run.policy_result) as PolicyResult) : null;
   if (policy?.verdict !== 'pass') {
@@ -217,6 +227,10 @@ async function executeRunTool(env: Env, args: ToolResult): Promise<ToolResult> {
   }
   if (run.custom_recipient) {
     return { run_id: runId, executed: false, error: 'ad-hoc payments are not auto-executed' };
+  }
+  if (await alreadyPaid(env, run.period, runId)) {
+    await requestApproval(env, { run_id: runId, reason: `payroll for ${run.period} was already sealed — confirm to pay again` });
+    return { run_id: runId, executed: false, status: 'pending_approval', reason: 'already paid; held for confirmation' };
   }
   const result = await setExecutingAndRun(env, runId);
   return { run_id: runId, executed: true, ...result };
@@ -335,9 +349,9 @@ async function isTerminal(env: Env, runId: number): Promise<boolean> {
 }
 
 async function finalizeRun(env: Env, runId: number): Promise<Record<string, unknown> | undefined> {
-  const row = await env.DB.prepare('SELECT status, policy_result, custom_recipient FROM payroll_runs WHERE id = ?')
+  const row = await env.DB.prepare('SELECT period, status, policy_result, custom_recipient FROM payroll_runs WHERE id = ?')
     .bind(runId)
-    .first<{ status: string; policy_result: string | null; custom_recipient: string | null }>();
+    .first<{ period: string; status: string; policy_result: string | null; custom_recipient: string | null }>();
   if (!row) return undefined;
 
   if (row.status === 'draft') {
@@ -348,7 +362,11 @@ async function finalizeRun(env: Env, runId: number): Promise<Record<string, unkn
     const policy: PolicyResult | null = after?.policy_result ? JSON.parse(after.policy_result) : null;
     const reason = policy?.reasons?.[0] ?? 'policy';
     if (policy?.verdict === 'pass' && !row.custom_recipient) {
-      await setExecutingAndRun(env, runId);
+      if (await alreadyPaid(env, row.period, runId)) {
+        await requestApproval(env, { run_id: runId, reason: `payroll for ${row.period} was already sealed — confirm to pay again` });
+      } else {
+        await setExecutingAndRun(env, runId);
+      }
     } else if (policy?.verdict === 'pass') {
       // ad-hoc payment to an allowed address — not on the auto-seal path.
       await rejectRun(env, runId, 'ad-hoc payments are not auto-executed');
@@ -374,7 +392,12 @@ function deterministicReply(run: Record<string, unknown>): string {
   const policy: PolicyResult | null = run.policy_result ? JSON.parse(String(run.policy_result)) : null;
 
   if (status === 'sealed') return `Sealed. Run ${run.id}, ${microToUsd(total)} paid for the day.`;
-  if (status === 'pending_approval') return `Held for a second signature — ${policy?.reasons?.[0] ?? `run ${run.id} is over the cap`}.`;
+  if (status === 'pending_approval') {
+    // A passing run held for approval = already paid today (double-pay guard);
+    // otherwise it's an over-cap run awaiting a second signature.
+    if (policy?.verdict === 'pass') return `Today's payroll was already sealed — held for confirmation. Approve to pay again.`;
+    return `Held for a second signature — ${policy?.reasons?.[0] ?? `run ${run.id} is over the cap`}.`;
+  }
   if (status === 'failed') {
     if (policy && policy.verdict === 'rejected') return `Refused. ${policy.reasons[0] ?? 'blocked by policy'}.`;
     return `Run ${run.id} did not complete — see the audit log.`;
