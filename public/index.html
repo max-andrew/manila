@@ -106,8 +106,11 @@
   #approval-banner { background: var(--manila); border: 1px solid var(--ink); border-radius: 9px;
                      padding: .8rem .9rem; margin-bottom: .9rem; font-size: .85rem; color: var(--ink); }
   #approval-banner .who { font-weight: 600; }
-  #approval-banner button { background: var(--paper); color: var(--ink); margin-top: .55rem; }
+  #approval-banner .banner-actions { display: flex; gap: .5rem; margin-top: .6rem; }
+  #approval-banner button { background: var(--paper); color: var(--ink); }
   #approval-banner button:hover { background: #fff; }
+  #approval-banner .reject-btn { background: transparent; border-color: var(--stamp); color: var(--stamp); }
+  #approval-banner .reject-btn:hover { background: rgba(192,57,43,.08); }
 
   /* badges */
   .badge { font-family: var(--mono); font-size: .64rem; letter-spacing: .16em; padding: .12rem .4rem;
@@ -315,7 +318,7 @@ function addMsg(who, text, cls) {
 async function refreshApproval() {
   const audit = await fetch('/api/audit').then(r => r.json()).catch(() => []);
   const pending = audit.find(a => a.action === 'approval_requested');
-  const released = audit.find(a => a.action === 'approved' || a.action === 'run_sealed' || a.action === 'run_failed');
+  const released = audit.find(a => ['approved', 'declined', 'run_sealed', 'run_failed'].includes(a.action));
   const banner = el('approval-banner');
   if (pending && (!released || released.id < pending.id)) {
     let reason = '';
@@ -323,12 +326,29 @@ async function refreshApproval() {
     const dup = /already|again/i.test(reason);
     banner.innerHTML = `<span class="badge pending">${dup ? 'CONFIRM' : 'PENDING APPROVAL'}</span>
       <div style="margin:.5rem 0 .1rem"><span class="who">Run ${pending.run_id}</span> ${dup ? esc(reason) + '.' : 'needs a second signature on the envelope. ' + esc(reason)}</div>
-      <button data-run="${pending.run_id}">${dup ? 'Confirm — pay again' : 'Add second signature'}</button>`;
+      <div class="banner-actions">
+        <button class="approve-btn" data-run="${pending.run_id}">${dup ? 'Confirm — pay again' : 'Add second signature'}</button>
+        <button class="reject-btn" data-run="${pending.run_id}">Reject</button>
+      </div>`;
     banner.hidden = false;
-    banner.querySelector('button').onclick = approve;
+    banner.querySelector('.approve-btn').onclick = approve;
+    banner.querySelector('.reject-btn').onclick = reject;
   } else {
     banner.hidden = true;
   }
+}
+
+async function reject(e) {
+  const btn = e.target;
+  btn.disabled = true; btn.textContent = '…';
+  try {
+    const res = await fetch('/api/reject/' + btn.dataset.run, { method: 'POST' });
+    const data = await res.json();
+    addMsg('Agent', res.ok ? `Run ${btn.dataset.run} declined — nothing was paid.` : (data.error || 'Could not decline.'));
+  } catch (err) {
+    addMsg('Agent', 'Reject error: ' + err.message);
+  }
+  await load();
 }
 
 async function approve(e) {

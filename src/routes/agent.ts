@@ -49,6 +49,30 @@ agentApp.post('/approve/:id', async (c) => {
   return c.json({ run_id: runId, approved: true, ...result });
 });
 
+// Decline a pending run — the second signer rejects it. Nothing settles.
+agentApp.post('/reject/:id', async (c) => {
+  const env = c.env;
+  const runId = Number(c.req.param('id'));
+  const run = await env.DB.prepare('SELECT id, status FROM payroll_runs WHERE id = ?')
+    .bind(runId)
+    .first<{ id: number; status: string }>();
+  if (!run) return c.json({ error: 'run not found' }, 404);
+  if (run.status !== 'pending_approval') {
+    return c.json({ error: `run is ${run.status}, not pending_approval` }, 409);
+  }
+  await env.DB.prepare("UPDATE payroll_runs SET status = 'failed', updated_at = datetime('now') WHERE id = ?")
+    .bind(runId)
+    .run();
+  await audit(env.DB, {
+    actor: 'employer',
+    action: 'declined',
+    run_id: runId,
+    detail: { note: 'declined by the second signer' },
+    policy_result: 'blocked',
+  });
+  return c.json({ run_id: runId, declined: true });
+});
+
 // Open the envelope — employer-only audit export.
 agentApp.get('/audit.csv', async (c) => {
   const { results } = await c.env.DB.prepare(
