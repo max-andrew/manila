@@ -45,17 +45,16 @@
   .gh:hover { opacity: 1; }
   .gh svg { width: 22px; height: 22px; fill: currentColor; display: block; }
 
-  /* intro */
-  .intro { padding: 2.25rem 0 1.75rem; max-width: 760px; }
-  .intro h1 { font-size: 2rem; font-weight: 700; letter-spacing: -0.02em; line-height: 1.15; }
-  .intro p { margin-top: .9rem; color: var(--khaki); font-size: 1.02rem; }
-  .intro b { color: var(--ink); font-weight: 600; }
-
-  /* exhibit */
-  figure.exhibit { background: #fff; border: 1px solid var(--line); border-radius: 10px;
-                   box-shadow: var(--shadow); padding: 1.25rem; margin-bottom: 1.75rem; }
-  figure.exhibit img { width: 100%; max-width: 680px; height: auto; display: block; margin: 0 auto; }
-  figure.exhibit figcaption { text-align: center; color: var(--khaki); font-size: .82rem; margin-top: .9rem; }
+  /* hero: explanation + comparison side by side, so the live panels sit near the fold */
+  .hero { display: grid; grid-template-columns: 1fr 1.04fr; gap: 2.2rem; align-items: center;
+          padding: 1.5rem 0 1.6rem; }
+  .hero h1 { font-size: 1.95rem; font-weight: 700; letter-spacing: -0.02em; line-height: 1.14; }
+  .hero p { margin-top: .8rem; color: var(--khaki); font-size: 1rem; max-width: 46ch; }
+  .hero b { color: var(--ink); font-weight: 600; }
+  .hero figure { margin: 0; background: #fff; border: 1px solid var(--line); border-radius: 10px;
+                 box-shadow: var(--shadow); padding: 1rem 1.1rem; }
+  .hero figure img { width: 100%; height: auto; display: block; }
+  .hero figure figcaption { text-align: center; color: var(--khaki); font-size: .78rem; margin-top: .7rem; }
 
   /* app grid */
   main { display: grid; grid-template-columns: 0.9fr 1.25fr 1.35fr; gap: 1.1rem; align-items: start; }
@@ -128,7 +127,9 @@
 
   @media (max-width: 920px) {
     main { grid-template-columns: 1fr; }
-    .intro h1 { font-size: 1.6rem; }
+    .hero { grid-template-columns: 1fr; gap: 1.1rem; padding-top: 1rem; }
+    .hero h1 { font-size: 1.6rem; }
+    .hero figure { max-width: 560px; }
   }
 </style>
 </head>
@@ -146,15 +147,16 @@
     </nav>
   </header>
 
-  <section class="intro">
-    <h1>Confidential USDC payroll, operated by an agent.</h1>
-    <p>Under <b>1% of payroll</b> runs on stablecoins — because a public chain turns every salary into a permanent public record. Manila seals the envelope back up: an AI agent runs payroll from plain English, amounts and counterparties stay <b>sealed</b> on Arc, policy controls require a second signature over a cap, and the employer keeps a full, exportable audit trail.</p>
+  <section class="hero">
+    <div>
+      <h1>Confidential USDC payroll, operated by an agent.</h1>
+      <p>Under <b>1% of payroll</b> runs on stablecoins — a public chain turns every salary into a permanent public record. Manila seals the envelope back up: an agent runs payroll from plain English, amounts and counterparties stay <b>sealed</b> on Arc, and the employer keeps a full audit trail.</p>
+    </div>
+    <figure>
+      <img src="/assets/manila_public_vs_sealed_comparison.png" alt="The same three salaries: fully public on a normal chain, sealed on Manila with an employer-only audit export.">
+      <figcaption>The same run — public forever on a normal chain, sealed on Manila.</figcaption>
+    </figure>
   </section>
-
-  <figure class="exhibit">
-    <img src="/assets/manila_public_vs_sealed_comparison.png" alt="The same three salaries: fully public on a normal chain, sealed on Manila with an employer-only audit export.">
-    <figcaption>The same payroll run — public forever on a normal chain, sealed on Manila.</figcaption>
-  </figure>
 
   <main>
     <section class="card" id="treasury">
