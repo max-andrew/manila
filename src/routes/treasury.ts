@@ -9,20 +9,24 @@ import { treasuryUnlinkClient } from '../lib/unlink';
 import { ARC_USDC_ADDRESS } from '../lib/arc';
 import type { Env } from '../env';
 
-export const treasuryApp = new Hono<{ Bindings: Env }>();
+const fmt = (raw: string | bigint, d: number) => {
+  const n = Number(raw) / 10 ** d;
+  return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
 
-treasuryApp.get('/treasury', async (c) => {
-  const env = c.env;
+export type TreasuryBalances = {
+  treasury_address: string | null;
+  sealed: { available: boolean; raw?: string; formatted?: string; symbol?: string; error?: string };
+  fees: { available: boolean; raw?: string; formatted?: string; symbol?: string; error?: string };
+};
+
+// Live balances from chain/engine. Shared by /api/treasury and the readiness
+// preflight so "ready" can mean funded, not just wired.
+export async function readBalances(env: Env): Promise<TreasuryBalances> {
   const token = (env.UNLINK_TOKEN_ADDRESS || ARC_USDC_ADDRESS).toLowerCase();
   const decimals = Number(env.UNLINK_TOKEN_DECIMALS || '6');
 
-  const fmt = (raw: string | bigint, d: number) => {
-    const n = Number(raw) / 10 ** d;
-    return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  };
-
-  // Sealed payroll balance — the Unlink private pool.
-  let sealed: Record<string, unknown> = { available: false };
+  let sealed: TreasuryBalances['sealed'] = { available: false };
   try {
     const client = treasuryUnlinkClient(env);
     await client.ensureRegistered();
@@ -36,8 +40,7 @@ treasuryApp.get('/treasury', async (c) => {
     sealed = { available: false, error: err instanceof Error ? err.message : String(err) };
   }
 
-  // Fee balance — the treasury's Gateway nanopayment balance (native USDC).
-  let fees: Record<string, unknown> = { available: false };
+  let fees: TreasuryBalances['fees'] = { available: false };
   try {
     if (env.TREASURY_WALLET_ADDRESS) {
       const gw = new GatewayClient({ chain: 'arcTestnet', privateKey: generatePrivateKey() });
@@ -49,5 +52,9 @@ treasuryApp.get('/treasury', async (c) => {
     fees = { available: false, error: err instanceof Error ? err.message : String(err) };
   }
 
-  return c.json({ treasury_address: env.TREASURY_WALLET_ADDRESS ?? null, sealed, fees });
-});
+  return { treasury_address: env.TREASURY_WALLET_ADDRESS ?? null, sealed, fees };
+}
+
+export const treasuryApp = new Hono<{ Bindings: Env }>();
+
+treasuryApp.get('/treasury', async (c) => c.json(await readBalances(c.env)));

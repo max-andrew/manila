@@ -4,6 +4,7 @@
 import { Hono } from 'hono';
 import { arcKind, usdcAddressOf } from './seal';
 import { sidecarHealth } from '../lib/signer';
+import { readBalances } from './treasury';
 import type { Env } from '../env';
 
 export const statusApp = new Hono<{ Bindings: Env }>();
@@ -57,12 +58,23 @@ statusApp.get('/status', async (c) => {
     with_unlink_address: counts?.with_unlink ?? 0,
   };
 
+  // Funding — real balances, so "ready" means money can actually move.
+  const balances = await readBalances(env);
+  const funding = {
+    sealed_funded: balances.sealed.available === true && Number(balances.sealed.raw ?? 0) > 0,
+    fees_funded: balances.fees.available === true && Number(balances.fees.raw ?? 0) > 0,
+    sealed: balances.sealed.formatted ?? null,
+    fees: balances.fees.formatted ?? null,
+  };
+
   const m1_ready =
     arc.supported === true &&
     Object.values(config).every(Boolean) &&
     sidecar.reachable === true &&
     employees.total > 0 &&
-    employees.with_unlink_address === employees.total;
+    employees.with_unlink_address === employees.total &&
+    funding.sealed_funded &&
+    funding.fees_funded;
 
-  return c.json({ m1_ready, arc, config, sidecar, employees });
+  return c.json({ m1_ready, arc, config, sidecar, employees, funding });
 });
