@@ -96,6 +96,16 @@
   #approval-banner .reject-btn { background: transparent; border-color: var(--stamp); color: var(--stamp); }
   #approval-banner .reject-btn:hover { background: rgba(192,57,43,.08); }
 
+  /* controls (policy) */
+  .controls { display: flex; flex-wrap: wrap; gap: 1.4rem 2.6rem; align-items: flex-end; }
+  .ctrl { min-width: 6.5rem; }
+  .ctrl .eyebrow { display: block; }
+  .ctrl .v { font-family: var(--mono); font-size: 1.3rem; color: var(--ink); display: block; margin: .2rem 0; }
+  .ctrl .d { font-size: .67rem; color: var(--khaki); }
+  .ctrl .v.stamp { color: var(--stamp); }
+  .p-input { width: 4.2rem; font-family: var(--mono); font-size: 1.05rem; padding: .1rem .3rem; border: 1px solid var(--ink); border-radius: 5px; }
+  #policy-save { font-size: .72rem; padding: .4rem .8rem; }
+
   /* badges */
   .badge { font-family: var(--mono); font-size: .64rem; letter-spacing: .16em; padding: .12rem .4rem; border-radius: 3px; display: inline-block; }
   .badge.pending { color: var(--stamp); border: 1.5px solid var(--stamp); }
@@ -198,6 +208,11 @@
       <p class="agent-foot">Manual today — a <b>Cloudflare Cron Trigger</b> can run it daily, hands-off.</p>
     </section>
 
+    <section class="card" id="policy">
+      <h2>Controls — the rules the agent can't talk past <button class="link-btn" id="policy-edit">Edit</button></h2>
+      <div class="controls" id="controls"></div>
+    </section>
+
     <div class="row-2">
       <section class="card" id="treasury">
         <h2>Treasury</h2>
@@ -284,13 +299,15 @@ function renderRoster(employees) {
 
 async function load() {
   try {
-    const [health, employees, audit, treasury] = await Promise.all([
+    const [health, employees, audit, treasury, policy] = await Promise.all([
       fetch('/api/health').then(r => r.json()),
       fetch('/api/employees').then(r => r.json()),
       fetch('/api/audit').then(r => r.json()),
       fetch('/api/treasury').then(r => r.json()).catch(() => null),
+      fetch('/api/policy').then(r => r.json()).catch(() => null),
     ]);
     setStatus(health.ok ? 'Arc testnet · live' : 'degraded', health.ok ? 'live' : 'err');
+    renderPolicy(policy);
 
     if (treasury?.sealed?.available) {
       el('treasury-balance').textContent = '$' + treasury.sealed.formatted;
@@ -325,6 +342,43 @@ async function load() {
   } catch (err) {
     setStatus('error', 'err');
   }
+}
+
+let policyEdit = false;
+function renderPolicy(p) {
+  if (!p || p.error) return;
+  const cap = (p.per_run_cap_micro / 1e6).toFixed(2);
+  const hard = (p.hard_cap_micro / 1e6).toFixed(2);
+  el('policy-edit').textContent = policyEdit ? 'Cancel' : 'Edit';
+  if (policyEdit) {
+    el('controls').innerHTML = `
+      <div class="ctrl"><span class="eyebrow">Per-run cap</span><div class="v">$<input class="p-input" id="p-cap" type="number" step="0.01" value="${cap}"></div><span class="d">over → second signature</span></div>
+      <div class="ctrl"><span class="eyebrow">Hard ceiling</span><div class="v">$<input class="p-input" id="p-hard" type="number" step="0.01" value="${hard}"></div><span class="d">over → refused</span></div>
+      <div class="ctrl"><span class="eyebrow">Min pay</span><div class="v"><input class="p-input" id="p-min" type="number" value="${p.min_pay_pct}">%</div><span class="d">below → refused</span></div>
+      <div class="ctrl"><span class="eyebrow">Max bonus</span><div class="v">+<input class="p-input" id="p-max" type="number" value="${p.max_bonus_pct}">%</div><span class="d">above → refused</span></div>
+      <div class="ctrl"><button id="policy-save">Save controls</button></div>`;
+    el('policy-save').onclick = savePolicy;
+  } else {
+    el('controls').innerHTML = `
+      <div class="ctrl"><span class="eyebrow">Per-run cap</span><span class="v">$${cap}</span><span class="d">over → second signature</span></div>
+      <div class="ctrl"><span class="eyebrow">Hard ceiling</span><span class="v stamp">$${hard}</span><span class="d">over → refused outright</span></div>
+      <div class="ctrl"><span class="eyebrow">Pay band</span><span class="v">${p.min_pay_pct}% – +${p.max_bonus_pct}%</span><span class="d">outside → refused</span></div>
+      <div class="ctrl"><span class="eyebrow">Allowlist</span><span class="v">${p.allowlist.length}</span><span class="d">off-list → refused · set via Team</span></div>`;
+  }
+}
+async function savePolicy() {
+  const body = {
+    per_run_cap_usd: Number(el('p-cap').value),
+    hard_cap_usd: Number(el('p-hard').value),
+    min_pay_pct: Number(el('p-min').value),
+    max_bonus_pct: Number(el('p-max').value),
+  };
+  const btn = el('policy-save'); btn.disabled = true; btn.textContent = '…';
+  const res = await fetch('/api/policy', { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  const data = await res.json();
+  if (!res.ok) { addMsg('Agent', 'Controls: ' + (data.error || 'update failed')); btn.disabled = false; btn.textContent = 'Save controls'; return; }
+  policyEdit = false;
+  await load();
 }
 
 function policyBadge(r) {
@@ -438,6 +492,7 @@ el('chat-form').addEventListener('submit', (e) => { e.preventDefault(); sendMess
 el('chips').addEventListener('click', (e) => { const chip = e.target.closest('.chip'); if (chip) sendMessage(chip.dataset.msg); });
 el('manage-toggle').addEventListener('click', () => { manageMode = !manageMode; load(); });
 el('ae-add').addEventListener('click', addEmployee);
+el('policy-edit').addEventListener('click', () => { policyEdit = !policyEdit; load(); });
 
 load();
 </script>
