@@ -31,6 +31,29 @@ export function treasuryUnlinkClient(env: Env) {
   });
 }
 
+// Provision a fresh private (unlink1) account for a new employee so they can
+// receive sealed pay: generate a mnemonic, derive the address, register it.
+export async function provisionRecipient(env: Env): Promise<string> {
+  const { generateMnemonic, english } = await import('viem/accounts');
+  const admin = unlinkAdmin(env);
+  const client = createUnlinkClient({
+    environment: UNLINK_ENVIRONMENT,
+    account: account.fromMnemonic({ mnemonic: generateMnemonic(english) }),
+    register: (payload) => admin.users.register(payload),
+    authorizationToken: {
+      provider: async (ctx) => {
+        const issued = await admin.authorizationTokens.issue({
+          subjectType: ctx.subjectType ?? 'unlink_address',
+          unlinkAddress: ctx.unlinkAddress,
+        } as Parameters<typeof admin.authorizationTokens.issue>[0]);
+        return { token: issued.token, expiresAt: issued.expiresAt };
+      },
+    },
+  });
+  await client.ensureRegistered();
+  return client.getAddress();
+}
+
 // One sealed salary transfer. Amounts in micro-USDC (base units).
 export async function sealTransfer(
   env: Env,

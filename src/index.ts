@@ -5,17 +5,11 @@ import { disburseApp } from './routes/disburse';
 import { agentApp } from './routes/agent';
 import { statusApp } from './routes/status';
 import { treasuryApp } from './routes/treasury';
+import { employeesApp } from './routes/employees';
 
 const app = new Hono<{ Bindings: Env }>();
 
 app.get('/api/health', (c) => c.json({ ok: true, service: 'manila' }));
-
-app.get('/api/employees', async (c) => {
-  const { results } = await c.env.DB.prepare(
-    'SELECT id, name, wallet, salary_micro, schedule FROM employees ORDER BY id'
-  ).all();
-  return c.json(results);
-});
 
 app.get('/api/policy', async (c) => {
   const row = await c.env.DB.prepare(
@@ -40,6 +34,7 @@ app.route('/api', disburseApp);
 app.route('/api', agentApp);
 app.route('/api', statusApp);
 app.route('/api', treasuryApp);
+app.route('/api', employeesApp);
 
 app.onError((err, c) => {
   console.error(err);
