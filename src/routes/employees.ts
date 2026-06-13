@@ -42,12 +42,21 @@ employeesApp.post('/employees', async (c) => {
       : privateKeyToAccount(generatePrivateKey()).address;
   const salaryMicro = Math.round(daily * 1e6);
 
-  // Best-effort: give the hire a private account so they're payable.
-  let unlinkAddress: string | null = null;
-  try {
-    unlinkAddress = await provisionRecipient(env);
-  } catch (err) {
-    console.error('unlink provisioning failed (employee still added):', err);
+  // Where sealed pay goes. The employee can bring their own private (unlink1)
+  // receiving address; if they don't, we provision and register one for them.
+  const provided =
+    typeof body.unlink_address === 'string' && body.unlink_address.trim().startsWith('unlink1')
+      ? body.unlink_address.trim()
+      : null;
+  let unlinkAddress: string | null = provided;
+  let provisioned = false;
+  if (!unlinkAddress) {
+    try {
+      unlinkAddress = await provisionRecipient(env);
+      provisioned = true;
+    } catch (err) {
+      console.error('unlink provisioning failed (employee still added):', err);
+    }
   }
 
   const row = await env.DB.prepare(
@@ -58,8 +67,8 @@ employeesApp.post('/employees', async (c) => {
   await setAllowlist(env, (list) =>
     list.some((a) => a.toLowerCase() === wallet.toLowerCase()) ? list : [...list, wallet]
   );
-  await audit(env.DB, { actor: 'employer', action: 'employee_added', detail: { id: row?.id, name, daily_usd: daily, payable: !!unlinkAddress } });
-  return c.json({ id: row?.id, name, wallet, salary_micro: salaryMicro, unlink_address: unlinkAddress, payable: !!unlinkAddress });
+  await audit(env.DB, { actor: 'employer', action: 'employee_added', detail: { id: row?.id, name, daily_usd: daily, payable: !!unlinkAddress, provisioned } });
+  return c.json({ id: row?.id, name, wallet, salary_micro: salaryMicro, unlink_address: unlinkAddress, payable: !!unlinkAddress, provisioned });
 });
 
 employeesApp.patch('/employees/:id', async (c) => {
