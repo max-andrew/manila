@@ -112,9 +112,13 @@
   #audit-table { font-size: .76rem; }
   .seal a { font-family: var(--mono); font-size: .72rem; color: var(--khaki); text-decoration: none; white-space: nowrap; }
   .seal a:hover { color: var(--ink); }
-  .envelope-btn { display: inline-flex; align-items: center; gap: .4rem; margin-top: 1rem;
-                  background: #fff; color: var(--ink); border: 1px solid var(--ink); font-size: .72rem; }
-  .envelope-btn:hover { background: var(--paper); }
+  .explorer-links { margin-top: .7rem; display: flex; flex-wrap: wrap; gap: .15rem .9rem; }
+  .explorer-links a { font-family: var(--mono); font-size: .7rem; color: var(--khaki); text-decoration: none; white-space: nowrap; }
+  .explorer-links a:hover { color: var(--ink); text-decoration: underline; }
+  .envelope-btn { display: inline-flex; flex-direction: column; gap: .12rem; margin-top: 1.1rem; text-decoration: none; }
+  .envelope-btn .env-main { font-weight: 600; font-size: .84rem; color: var(--ink); }
+  .envelope-btn .env-sub { font-family: var(--mono); font-size: .68rem; color: var(--khaki); }
+  .envelope-btn:hover .env-main { text-decoration: underline; }
 
   /* footer */
   footer { margin-top: 2.5rem; padding-top: 1.1rem; border-top: 1px solid var(--line);
@@ -157,6 +161,7 @@
       <h2>Treasury</h2>
       <div id="treasury-balance" class="muted">—</div>
       <div id="treasury-sub" class="muted">sealed USDC on Arc testnet</div>
+      <div id="treasury-links" class="explorer-links"></div>
       <table id="employees">
         <thead><tr><th>Employee</th><th style="text-align:right">Salary</th></tr></thead>
         <tbody></tbody>
@@ -184,7 +189,10 @@
         <thead><tr><th>When</th><th>Actor</th><th>Action</th><th>Policy</th><th>Seal</th></tr></thead>
         <tbody></tbody>
       </table>
-      <a id="csv-link" class="envelope-btn" href="/api/audit.csv">Open the envelope · CSV</a>
+      <a id="csv-link" class="envelope-btn" href="/api/audit.csv" title="Download the complete audit trail as CSV">
+        <span class="env-main">Open the envelope ↓</span>
+        <span class="env-sub">Download the full audit trail (CSV)</span>
+      </a>
     </section>
   </main>
 
@@ -200,7 +208,10 @@
 const usd = (micro) => '$' + (Number(micro) / 1e6).toLocaleString('en-US', { minimumFractionDigits: 2 });
 const esc = (s) => String(s ?? '').replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
 const el = (id) => document.getElementById(id);
-const EXPLORER = 'https://testnet.arcscan.app/tx/';
+const ARCSCAN = 'https://testnet.arcscan.app';
+const EXPLORER = ARCSCAN + '/tx/';
+const VAULT_ADDRESS = '0x2f217B2A62826F247084B207106233E5F67c60Ac'; // deployed PayrollVault
+const short = (h) => h ? h.slice(0, 6) + '…' + h.slice(-4) : '';
 
 function setStatus(text, kind) {
   el('status').textContent = text;
@@ -213,7 +224,7 @@ function sealCell(refsJson) {
   let refs = [];
   try { refs = JSON.parse(refsJson || '[]'); } catch {}
   const hash = (refs.find(r => /^0x[0-9a-f]{64}$/i.test(r)) || '');
-  return hash ? `<a href="${EXPLORER}${hash}" target="_blank" rel="noopener" title="${hash}">sealed&nbsp;↗</a>` : '';
+  return hash ? `<a href="${EXPLORER}${hash}" target="_blank" rel="noopener" title="View sealed disbursement on Arc: ${hash}">${short(hash)}&nbsp;↗</a>` : '';
 }
 
 async function load() {
@@ -232,6 +243,11 @@ async function load() {
       el('treasury-sub').textContent =
         'sealed USDC' + (treasury.fees?.available ? ` · $${treasury.fees.formatted} nanopayment balance` : ' on Arc testnet');
     }
+    const addr = treasury?.treasury_address;
+    el('treasury-links').innerHTML = [
+      addr ? `<a href="${ARCSCAN}/address/${addr}" target="_blank" rel="noopener" title="${addr}">Treasury wallet&nbsp;↗</a>` : '',
+      `<a href="${ARCSCAN}/address/${VAULT_ADDRESS}" target="_blank" rel="noopener" title="${VAULT_ADDRESS}">Vesting vault&nbsp;↗</a>`,
+    ].filter(Boolean).join('');
 
     document.querySelector('#employees tbody').innerHTML = employees
       .map(e => `<tr><td>${esc(e.name)}</td><td class="amt" style="text-align:right">${usd(e.salary_micro)}</td></tr>`)
