@@ -55,6 +55,8 @@
   #approval-banner button { background: var(--paper); color: var(--ink); margin-top: 0.4rem; }
   #csv-link { font-family: var(--mono); font-size: 0.72rem; color: var(--ink); display: inline-block;
               margin-top: 0.75rem; }
+  .seal a { font-family: var(--mono); font-size: 0.72rem; color: var(--khaki); text-decoration: none; }
+  .seal a:hover { color: var(--ink); }
 </style>
 </head>
 <body>
@@ -71,7 +73,7 @@
   <section id="treasury">
     <h2>Treasury</h2>
     <div id="treasury-balance" class="num muted">—</div>
-    <div class="muted" style="font-size:0.8rem">USDC on Arc testnet</div>
+    <div id="treasury-sub" class="muted" style="font-size:0.8rem">USDC on Arc testnet</div>
     <table id="employees" style="margin-top:1rem">
       <thead><tr><th>Employee</th><th>Salary</th></tr></thead>
       <tbody></tbody>
@@ -92,7 +94,7 @@
   <section id="audit">
     <h2>Audit</h2>
     <table id="audit-table">
-      <thead><tr><th>When</th><th>Actor</th><th>Action</th><th>Result</th></tr></thead>
+      <thead><tr><th>When</th><th>Actor</th><th>Action</th><th>Result</th><th>Seal</th></tr></thead>
       <tbody></tbody>
     </table>
     <a id="csv-link" href="/api/audit.csv">Open the envelope (CSV)</a>
@@ -105,15 +107,33 @@
 const usd = (micro) => '$' + (Number(micro) / 1e6).toLocaleString('en-US', { minimumFractionDigits: 2 });
 const esc = (s) => String(s ?? '').replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
 const el = (id) => document.getElementById(id);
+const EXPLORER = 'https://testnet.arcscan.app/tx/';
+
+// A sealed disbursement's tx_refs hold the on-chain hash; link it (amounts
+// stay hidden on the explorer — that's the point).
+function sealCell(refsJson) {
+  let refs = [];
+  try { refs = JSON.parse(refsJson || '[]'); } catch {}
+  const hash = (refs.find(r => /^0x[0-9a-f]{64}$/i.test(r)) || '');
+  return hash ? `<a href="${EXPLORER}${hash}" target="_blank" rel="noopener" title="${hash}">sealed&nbsp;↗</a>` : '';
+}
 
 async function load() {
   try {
-    const [health, employees, audit] = await Promise.all([
+    const [health, employees, audit, treasury] = await Promise.all([
       fetch('/api/health').then(r => r.json()),
       fetch('/api/employees').then(r => r.json()),
       fetch('/api/audit').then(r => r.json()),
+      fetch('/api/treasury').then(r => r.json()).catch(() => null),
     ]);
     el('status').textContent = health.ok ? 'manila · connected' : 'service degraded';
+
+    if (treasury?.sealed?.available) {
+      el('treasury-balance').textContent = '$' + treasury.sealed.formatted;
+      el('treasury-balance').classList.remove('muted');
+      el('treasury-sub').textContent =
+        `sealed USDC · ${treasury.fees?.available ? '$' + treasury.fees.formatted + ' fee balance' : 'Arc testnet'}`;
+    }
 
     document.querySelector('#employees tbody').innerHTML = employees
       .map(e => `<tr><td>${esc(e.name)}</td><td class="num">${usd(e.salary_micro)}</td></tr>`)
@@ -121,8 +141,8 @@ async function load() {
 
     document.querySelector('#audit-table tbody').innerHTML = audit.length
       ? audit.map(a => `<tr><td>${esc(a.created_at)}</td><td>${esc(a.actor)}</td><td>${esc(a.action)}</td>
-          <td>${esc(a.policy_result ?? '')}</td></tr>`).join('')
-      : '<tr><td colspan="4" class="muted">No entries yet.</td></tr>';
+          <td>${esc(a.policy_result ?? '')}</td><td class="seal">${sealCell(a.tx_refs)}</td></tr>`).join('')
+      : '<tr><td colspan="5" class="muted">No entries yet.</td></tr>';
 
     await refreshApproval();
   } catch (err) {
