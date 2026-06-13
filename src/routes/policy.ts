@@ -37,8 +37,9 @@ policyApp.patch('/policy', async (c) => {
 
   const cap = num(body.per_run_cap_usd);
   const hard = num(body.hard_cap_usd);
-  if (cap != null && cap >= 0) { sets.push('per_run_cap_micro = ?'); binds.push(Math.round(cap * 1e6)); }
-  if (hard != null && hard >= 0) { sets.push('hard_cap_micro = ?'); binds.push(Math.round(hard * 1e6)); }
+  // Caps are set in whole dollars.
+  if (cap != null && cap >= 0) { sets.push('per_run_cap_micro = ?'); binds.push(Math.round(cap) * 1_000_000); }
+  if (hard != null && hard >= 0) { sets.push('hard_cap_micro = ?'); binds.push(Math.round(hard) * 1_000_000); }
   const maxB = num(body.max_bonus_pct);
   const minP = num(body.min_pay_pct);
   if (maxB != null && maxB >= 0) { sets.push('max_bonus_pct = ?'); binds.push(Math.round(maxB)); }
