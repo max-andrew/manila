@@ -7,3 +7,5 @@ worker-configuration.d.ts
 sidecar/.wallet.json
 scripts/.unlink-accounts.json
 scripts/.gateway-test.json
+
+scripts/.gateway-ops.json
