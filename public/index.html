@@ -26,6 +26,10 @@
   body { background: var(--paper); color: var(--ink); font-family: var(--sans); line-height: 1.55; font-size: 15px; }
   .wrap { max-width: 1140px; margin: 0 auto; padding: 1.5rem 1.5rem 3rem; }
   a { color: inherit; }
+  img { max-width: 100%; }
+  /* grid/flex children must be allowed to shrink below their content's natural
+     width, or wide children (the comparison image, tables) overflow on phones */
+  .hero > *, .row-2 > *, main > * { min-width: 0; }
   .num, .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
   .muted { color: var(--khaki); }
   .eyebrow { font-family: var(--mono); font-size: .64rem; text-transform: uppercase; letter-spacing: .16em; color: var(--khaki); font-weight: 500; }
@@ -57,7 +61,7 @@
   /* layout — agent on top (primary), treasury + audit below */
   main { display: flex; flex-direction: column; gap: 1.1rem; }
   .row-2 { display: grid; grid-template-columns: 1fr 1.18fr; gap: 1.1rem; align-items: start; }
-  .card { background: #fff; border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); padding: 1.2rem 1.3rem; }
+  .card { background: #fff; border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); padding: 1.2rem 1.3rem; min-width: 0; }
   .card > h2 { font-family: var(--mono); font-size: .7rem; text-transform: uppercase; letter-spacing: .15em; color: var(--khaki);
                font-weight: 500; padding-bottom: .7rem; border-bottom: 1px solid var(--line); margin-bottom: 1rem;
                display: flex; align-items: center; justify-content: space-between; }
@@ -127,6 +131,10 @@
   table { width: 100%; border-collapse: collapse; font-size: .82rem; }
   #employees td { padding: .45rem .15rem; border-bottom: 1px solid var(--line); vertical-align: middle; }
   #employees tr:last-child td { border-bottom: none; }
+  #employees th { font-family: var(--mono); font-size: .6rem; text-transform: uppercase; letter-spacing: .07em;
+                  color: var(--khaki); font-weight: 500; text-align: left; padding: 0 .15rem .45rem; border-bottom: 1px solid var(--line); }
+  #employees .c { text-align: center; }
+  #employees .r { text-align: right; }
   .amt { font-family: var(--mono); font-variant-numeric: tabular-nums; }
   .paid { font-family: var(--mono); font-size: .68rem; color: #4f7a52; text-decoration: none; white-space: nowrap; }
   .paid:hover { text-decoration: underline; }
@@ -158,11 +166,32 @@
   footer { margin-top: 2.5rem; padding-top: 1.1rem; border-top: 1px solid var(--line); display: flex; flex-wrap: wrap; gap: .5rem 1.25rem; align-items: center; font-family: var(--mono); font-size: .72rem; color: var(--khaki); }
   footer .stack { margin-left: auto; }
 
+  /* one column: the comparison figure becomes a full-width card like the rest */
   @media (max-width: 920px) {
-    .hero { grid-template-columns: 1fr; gap: 1.1rem; padding-top: 1rem; }
-    .hero h1 { font-size: 1.6rem; }
-    .hero figure { max-width: 560px; }
+    .hero { grid-template-columns: 1fr; gap: 1.2rem; padding-top: 1rem; }
+    .hero h1 { font-size: 1.7rem; }
+    .hero p { max-width: none; }
+    .hero figure { max-width: none; }
+    .hero figure img { max-width: 620px; margin: 0 auto; }
     .row-2 { grid-template-columns: 1fr; }
+  }
+  /* phones */
+  @media (max-width: 560px) {
+    .wrap { padding: 1rem 1rem 2.5rem; }
+    .topbar { padding-bottom: 1rem; }
+    .logo { height: 44px; }
+    .hero { padding: .75rem 0 1.2rem; }
+    .hero h1 { font-size: 1.4rem; }
+    .hero p { font-size: .95rem; }
+    .card { padding: 1rem 1.05rem; }
+    .card > h2 { flex-wrap: wrap; gap: .4rem; }
+    #treasury-balance { font-size: 1.85rem; }
+    .msg { max-width: 92%; }
+    .controls { gap: 1.1rem 1.8rem; }
+    .audit-scroll { overflow-x: auto; }
+    #audit-table { min-width: 22rem; }
+    footer { gap: .35rem .9rem; }
+    footer .stack { margin-left: 0; flex-basis: 100%; }
   }
 </style>
 </head>
@@ -222,7 +251,7 @@
         <div id="treasury-links" class="explorer-links"></div>
 
         <div class="roster-head">
-          <span class="eyebrow">Team · daily rate</span>
+          <span class="eyebrow">Team</span>
           <button class="link-btn" id="manage-toggle">Manage</button>
         </div>
         <table id="employees"><tbody></tbody></table>
@@ -279,21 +308,28 @@ function sealCell(refsJson) {
 function renderRoster(employees) {
   el('add-employee').hidden = !manageMode;
   el('manage-toggle').textContent = manageMode ? 'Done' : 'Manage';
-  document.querySelector('#employees tbody').innerHTML = employees.map(e => {
-    if (manageMode) {
-      return `<tr><td>${esc(e.name)}</td>
-        <td style="text-align:right"><input class="rate-input" type="number" step="0.01" value="${(e.salary_micro/1e6).toFixed(2)}" data-id="${e.id}"></td>
-        <td style="text-align:right;width:1.5rem"><button class="rm-btn" data-id="${e.id}" title="Remove">×</button></td></tr>`;
-    }
-    const paid = e.last_seal_ref
-      ? `<a class="paid" href="${EXPLORER}${e.last_seal_ref}" target="_blank" rel="noopener" title="Sealed ${esc(e.last_paid_at || '')}">paid&nbsp;✓</a>`
-      : `<span class="unpaid">—</span>`;
-    return `<tr><td>${esc(e.name)}</td><td style="text-align:center">${paid}</td><td class="amt" style="text-align:right">${usd(e.salary_micro)}</td></tr>`;
-  }).join('') || '<tr><td class="muted">No team members.</td></tr>';
+  const today = new Date().toISOString().slice(0, 10);
+  const table = el('employees');
+  const empty = '<tr><td class="muted">No team members.</td></tr>';
 
   if (manageMode) {
-    document.querySelectorAll('.rm-btn').forEach(b => b.onclick = () => removeEmployee(b.dataset.id));
-    document.querySelectorAll('.rate-input').forEach(i => i.onchange = () => updateRate(i.dataset.id, i.value));
+    table.innerHTML = `<thead><tr><th>Name</th><th class="r">Daily rate</th><th></th></tr></thead><tbody>${
+      employees.map(e => `<tr><td>${esc(e.name)}</td>
+        <td class="r"><input class="rate-input" type="number" step="0.01" value="${(e.salary_micro/1e6).toFixed(2)}" data-id="${e.id}"></td>
+        <td class="r" style="width:1.4rem"><button class="rm-btn" data-id="${e.id}" title="Remove">×</button></td></tr>`).join('') || empty
+    }</tbody>`;
+    table.querySelectorAll('.rm-btn').forEach(b => b.onclick = () => removeEmployee(b.dataset.id));
+    table.querySelectorAll('.rate-input').forEach(i => i.onchange = () => updateRate(i.dataset.id, i.value));
+  } else {
+    table.innerHTML = `<thead><tr><th>Name</th><th class="c">Paid today</th><th class="r">Per day</th></tr></thead><tbody>${
+      employees.map(e => {
+        const paidToday = e.last_paid_at && String(e.last_paid_at).slice(0, 10) === today;
+        const status = paidToday
+          ? `<a class="paid" href="${EXPLORER}${e.last_seal_ref}" target="_blank" rel="noopener" title="Sealed today — view on Arc (amount stays hidden)">paid ✓</a>`
+          : `<span class="unpaid">not yet</span>`;
+        return `<tr><td>${esc(e.name)}</td><td class="c">${status}</td><td class="amt r">${usd(e.salary_micro)}</td></tr>`;
+      }).join('') || empty
+    }</tbody>`;
   }
 }
 
@@ -347,13 +383,13 @@ async function load() {
 let policyEdit = false;
 function renderPolicy(p) {
   if (!p || p.error) return;
-  const cap = (p.per_run_cap_micro / 1e6).toFixed(2);
-  const hard = (p.hard_cap_micro / 1e6).toFixed(2);
+  const cap = Math.round(p.per_run_cap_micro / 1e6);
+  const hard = Math.round(p.hard_cap_micro / 1e6);
   el('policy-edit').textContent = policyEdit ? 'Cancel' : 'Edit';
   if (policyEdit) {
     el('controls').innerHTML = `
-      <div class="ctrl"><span class="eyebrow">Per-run cap</span><div class="v">$<input class="p-input" id="p-cap" type="number" step="0.01" value="${cap}"></div><span class="d">over → second signature</span></div>
-      <div class="ctrl"><span class="eyebrow">Hard ceiling</span><div class="v">$<input class="p-input" id="p-hard" type="number" step="0.01" value="${hard}"></div><span class="d">over → refused</span></div>
+      <div class="ctrl"><span class="eyebrow">Per-run cap</span><div class="v">$<input class="p-input" id="p-cap" type="number" step="1" min="0" value="${cap}"></div><span class="d">over → second signature</span></div>
+      <div class="ctrl"><span class="eyebrow">Hard ceiling</span><div class="v">$<input class="p-input" id="p-hard" type="number" step="1" min="0" value="${hard}"></div><span class="d">over → refused</span></div>
       <div class="ctrl"><span class="eyebrow">Min pay</span><div class="v"><input class="p-input" id="p-min" type="number" value="${p.min_pay_pct}">%</div><span class="d">below → refused</span></div>
       <div class="ctrl"><span class="eyebrow">Max bonus</span><div class="v">+<input class="p-input" id="p-max" type="number" value="${p.max_bonus_pct}">%</div><span class="d">above → refused</span></div>
       <div class="ctrl"><button id="policy-save">Save controls</button></div>`;
