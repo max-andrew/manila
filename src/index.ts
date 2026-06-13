@@ -3,6 +3,7 @@ import type { Env } from './env';
 import { sealApp } from './routes/seal';
 import { disburseApp } from './routes/disburse';
 import { agentApp } from './routes/agent';
+import { statusApp } from './routes/status';
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -36,6 +37,7 @@ app.get('/api/audit', async (c) => {
 app.route('/api', sealApp);
 app.route('/api', disburseApp);
 app.route('/api', agentApp);
+app.route('/api', statusApp);
 
 app.onError((err, c) => {
   console.error(err);
