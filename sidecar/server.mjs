@@ -52,6 +52,18 @@ const { DynamicEvmWalletClient } = await import('@dynamic-labs-wallet/node-evm')
 const client = new DynamicEvmWalletClient({ environmentId: DYNAMIC_ENV_ID });
 await client.authenticateApiToken(DYNAMIC_API_KEY);
 
+// Dynamic auth tokens expire after a while; if a signing call fails, refresh
+// the token once and retry so a long-running sidecar self-heals during a demo.
+async function withReauth(fn) {
+  try {
+    return await fn();
+  } catch (err) {
+    console.warn(`sign failed (${err?.message ?? err}); re-authenticating and retrying…`);
+    await client.authenticateApiToken(DYNAMIC_API_KEY);
+    return fn();
+  }
+}
+
 async function loadOrCreateWallet() {
   if (existsSync(WALLET_FILE)) {
     const saved = JSON.parse(readFileSync(WALLET_FILE, 'utf8'));
@@ -114,27 +126,21 @@ const server = http.createServer(async (req, res) => {
 
   try {
     if (req.url === '/sign-typed-data') {
-      const signature = await client.signTypedData({
-        walletMetadata,
-        typedData: payload.typedData,
-        password: WALLET_PASSWORD,
-      });
+      const signature = await withReauth(() =>
+        client.signTypedData({ walletMetadata, typedData: payload.typedData, password: WALLET_PASSWORD })
+      );
       return json(res, 200, { signature, address });
     }
     if (req.url === '/sign-transaction') {
-      const signedTx = await client.signTransaction({
-        walletMetadata,
-        transaction: coerceTx(payload.transaction),
-        password: WALLET_PASSWORD,
-      });
+      const signedTx = await withReauth(() =>
+        client.signTransaction({ walletMetadata, transaction: coerceTx(payload.transaction), password: WALLET_PASSWORD })
+      );
       return json(res, 200, { signedTx, address });
     }
     if (req.url === '/sign-message') {
-      const signature = await client.signMessage({
-        walletMetadata,
-        message: payload.message,
-        password: WALLET_PASSWORD,
-      });
+      const signature = await withReauth(() =>
+        client.signMessage({ walletMetadata, message: payload.message, password: WALLET_PASSWORD })
+      );
       return json(res, 200, { signature, address });
     }
     return json(res, 404, { error: 'not found' });
