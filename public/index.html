@@ -34,6 +34,24 @@
   .badge.released { color: #fff; background: var(--ink); }
   #treasury-balance { font-size: 1.8rem; margin: 0.5rem 0; }
   footer { margin-top: 1.5rem; color: var(--khaki); font-size: 0.75rem; }
+  #chat-log { margin-bottom: 0.75rem; max-height: 11rem; overflow-y: auto; }
+  .msg { font-size: 0.8rem; margin: 0.3rem 0; line-height: 1.4; }
+  .msg.you { color: var(--khaki); }
+  .msg.agent { color: var(--ink); }
+  .msg .who { font-family: var(--sans); text-transform: uppercase; letter-spacing: 0.1em;
+              font-size: 0.6rem; color: var(--khaki); margin-right: 0.4rem; }
+  #chat-form { display: flex; gap: 0.5rem; }
+  #chat-input { flex: 1; font-family: var(--mono); font-size: 0.8rem; padding: 0.4rem 0.5rem;
+                border: 1.5px solid var(--ink); background: #fff; color: var(--ink); }
+  button { font-family: var(--mono); font-size: 0.75rem; letter-spacing: 0.06em; cursor: pointer;
+           padding: 0.4rem 0.8rem; border: 1.5px solid var(--ink); background: var(--ink); color: #fff; }
+  button:disabled { opacity: 0.5; cursor: default; }
+  #approval-banner { background: var(--manila); border: 1.5px solid var(--ink); padding: 0.6rem 0.75rem;
+                     margin-bottom: 0.75rem; font-size: 0.8rem; }
+  #approval-banner .badge { margin-bottom: 0.4rem; display: inline-block; }
+  #approval-banner button { background: var(--paper); color: var(--ink); margin-top: 0.4rem; }
+  #csv-link { font-family: var(--mono); font-size: 0.72rem; color: var(--ink); display: inline-block;
+              margin-top: 0.75rem; }
 </style>
 </head>
 <body>
@@ -55,7 +73,13 @@
 
   <section id="agent">
     <h2>Agent</h2>
-    <div id="chat-log" class="muted" style="font-size:0.8rem">Awaiting instructions.</div>
+    <div id="approval-banner" hidden></div>
+    <div id="chat-log"><div class="muted" style="font-size:0.8rem">Awaiting instructions.</div></div>
+    <form id="chat-form" autocomplete="off">
+      <input id="chat-input" type="text" placeholder="Run June payroll"
+             value="Run June payroll with a 25% bonus" />
+      <button type="submit" id="chat-send">Send</button>
+    </form>
   </section>
 
   <section id="audit">
@@ -64,6 +88,7 @@
       <thead><tr><th>When</th><th>Actor</th><th>Action</th><th>Result</th></tr></thead>
       <tbody></tbody>
     </table>
+    <a id="csv-link" href="/api/audit.csv">Open the envelope (CSV)</a>
   </section>
 </main>
 
@@ -71,6 +96,8 @@
 
 <script>
 const usd = (micro) => '$' + (Number(micro) / 1e6).toLocaleString('en-US', { minimumFractionDigits: 2 });
+const esc = (s) => String(s ?? '').replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+const el = (id) => document.getElementById(id);
 
 async function load() {
   try {
@@ -79,20 +106,93 @@ async function load() {
       fetch('/api/employees').then(r => r.json()),
       fetch('/api/audit').then(r => r.json()),
     ]);
-    document.getElementById('status').textContent = health.ok ? 'manila · connected' : 'service degraded';
+    el('status').textContent = health.ok ? 'manila · connected' : 'service degraded';
 
     document.querySelector('#employees tbody').innerHTML = employees
-      .map(e => `<tr><td>${e.name}</td><td class="num">${usd(e.salary_micro)}</td></tr>`)
+      .map(e => `<tr><td>${esc(e.name)}</td><td class="num">${usd(e.salary_micro)}</td></tr>`)
       .join('');
 
     document.querySelector('#audit-table tbody').innerHTML = audit.length
-      ? audit.map(a => `<tr><td>${a.created_at}</td><td>${a.actor}</td><td>${a.action}</td>
-          <td>${a.policy_result ?? ''}</td></tr>`).join('')
+      ? audit.map(a => `<tr><td>${esc(a.created_at)}</td><td>${esc(a.actor)}</td><td>${esc(a.action)}</td>
+          <td>${esc(a.policy_result ?? '')}</td></tr>`).join('')
       : '<tr><td colspan="4" class="muted">No entries yet.</td></tr>';
+
+    await refreshApproval();
   } catch (err) {
-    document.getElementById('status').textContent = 'error: ' + err.message;
+    el('status').textContent = 'error: ' + err.message;
   }
 }
+
+function addMsg(who, text) {
+  const log = el('chat-log');
+  if (log.querySelector('.muted')) log.innerHTML = '';
+  const div = document.createElement('div');
+  div.className = 'msg ' + (who === 'You' ? 'you' : 'agent');
+  div.innerHTML = `<span class="who">${who}</span>${esc(text)}`;
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+}
+
+async function refreshApproval() {
+  // Surface the most recent run that is waiting for a second signature.
+  const audit = await fetch('/api/audit').then(r => r.json()).catch(() => []);
+  const pending = audit.find(a => a.action === 'approval_requested');
+  const released = audit.find(a => a.action === 'approved' || a.action === 'run_sealed' || a.action === 'run_failed');
+  const banner = el('approval-banner');
+  if (pending && (!released || released.id < pending.id)) {
+    let reason = '';
+    try { reason = JSON.parse(pending.detail).reason || ''; } catch {}
+    banner.innerHTML = `<span class="badge pending">PENDING APPROVAL</span>
+      <div>Run ${pending.run_id} needs a second signature. ${esc(reason)}</div>
+      <button data-run="${pending.run_id}">Add second signature</button>`;
+    banner.hidden = false;
+    banner.querySelector('button').onclick = approve;
+  } else {
+    banner.hidden = true;
+  }
+}
+
+async function approve(e) {
+  const btn = e.target;
+  btn.disabled = true;
+  btn.textContent = 'Releasing…';
+  try {
+    const res = await fetch('/api/approve/' + btn.dataset.run, { method: 'POST' });
+    const data = await res.json();
+    const sealed = (data.payments || []).filter(p => p.status === 'sealed').length;
+    addMsg('Agent', res.ok && sealed
+      ? `Released. ${sealed} payments sealed.`
+      : `Approved. ${data.message || (data.payments ? 'settlement pending — see audit log.' : data.error || '')}`);
+  } catch (err) {
+    addMsg('Agent', 'Approval error: ' + err.message);
+  }
+  await load();
+}
+
+el('chat-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const input = el('chat-input');
+  const message = input.value.trim();
+  if (!message) return;
+  addMsg('You', message);
+  input.value = '';
+  const send = el('chat-send');
+  send.disabled = true; send.textContent = '…';
+  try {
+    const res = await fetch('/api/agent', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ message }),
+    });
+    const data = await res.json();
+    addMsg('Agent', data.reply || data.error || 'No response.');
+  } catch (err) {
+    addMsg('Agent', 'Error: ' + err.message);
+  }
+  send.disabled = false; send.textContent = 'Send';
+  await load();
+});
+
 load();
 </script>
 </body>
