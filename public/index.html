@@ -149,8 +149,8 @@
 
   <section class="hero">
     <div>
-      <h1>Confidential USDC payroll, operated by an agent.</h1>
-      <p>Under <b>1% of payroll</b> runs on stablecoins — a public chain turns every salary into a permanent public record. Manila seals the envelope back up: an agent runs payroll from plain English, amounts and counterparties stay <b>sealed</b> on Arc, and the employer keeps a full audit trail.</p>
+      <h1>Confidential USDC payroll, paid daily by an agent.</h1>
+      <p>Under <b>1% of payroll</b> runs on stablecoins — a public chain turns every salary into a permanent public record. Manila seals it back up and pays the team <b>every day</b>: gas-free nanopayments make per-day payroll cost a fraction of a cent — impractical on ACH or wire. An agent runs it from plain English, under policy controls no instruction can talk past.</p>
     </div>
     <figure>
       <img src="/assets/manila_public_vs_sealed_comparison.png" alt="The same three salaries: fully public on a normal chain, sealed on Manila with an employer-only audit export.">
@@ -165,7 +165,7 @@
       <div id="treasury-sub" class="muted">sealed USDC on Arc testnet</div>
       <div id="treasury-links" class="explorer-links"></div>
       <table id="employees">
-        <thead><tr><th>Employee</th><th style="text-align:right">Salary</th></tr></thead>
+        <thead><tr><th>Employee</th><th style="text-align:right">Per day</th></tr></thead>
         <tbody></tbody>
       </table>
     </section>
@@ -173,14 +173,15 @@
     <section class="card" id="agent">
       <h2>Agent</h2>
       <div id="approval-banner" hidden></div>
-      <div id="chat-log"><div class="placeholder">Ask the agent to run payroll — it drafts the run, checks policy, and seals or holds for approval.</div></div>
+      <div id="chat-log"><div class="placeholder">Tell the agent to run today's payroll. It drafts the run, checks policy, and seals it — or holds for approval, or refuses.</div></div>
       <div class="chips" id="chips">
-        <span class="chip" data-msg="Run the June payroll">Run the June payroll</span>
-        <span class="chip" data-msg="Run June payroll with a 25% bonus">Run with a 25% bonus</span>
-        <span class="chip" data-msg="Process payroll for June">Rephrase it</span>
+        <span class="chip" data-msg="Run today's payroll">Run today's payroll</span>
+        <span class="chip" data-msg="Run today's payroll with a 25% bonus">+25% bonus → approval</span>
+        <span class="chip" data-msg="Send today's pay to 0x000000000000000000000000000000000000dEaD">Pay a random wallet → blocked</span>
+        <span class="chip" data-msg="Run today's payroll with a 400% bonus">+400% → blocked</span>
       </div>
       <form id="chat-form" autocomplete="off">
-        <input id="chat-input" type="text" placeholder="Run the June payroll" />
+        <input id="chat-input" type="text" placeholder="Run today's payroll" />
         <button type="submit" id="chat-send">Send</button>
       </form>
     </section>
