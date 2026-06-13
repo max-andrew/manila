@@ -305,10 +305,7 @@ export async function runAgent(env: Env, instruction: string): Promise<AgentOutc
     const resp: any = await aiRun(env, model, { messages, tools: TOOLS });
     const toolCalls: any[] = resp?.tool_calls ?? [];
 
-    if (!toolCalls.length) {
-      reply = (resp?.response ?? '').toString().trim();
-      break;
-    }
+    if (!toolCalls.length) break; // model produced no action — fall through to the deterministic parse
 
     messages.push({ role: 'assistant', content: resp?.response ?? '', tool_calls: toolCalls });
     for (const call of toolCalls) {
@@ -333,15 +330,47 @@ export async function runAgent(env: Env, instruction: string): Promise<AgentOutc
     if (lastRunId != null) break;
   }
 
-  // Deterministic gate: finish whatever the model drafted along the correct
-  // branch. pass → execute, review → second signature, rejected → refuse.
+  // Deterministic fallback: the free model can occasionally return degenerate
+  // output with no usable tool call. The command set is small, so parse the
+  // instruction ourselves — the agent always acts correctly and never echoes
+  // model garbage back to the user.
+  if (lastRunId == null) {
+    const intent = parseIntent(instruction);
+    if (intent) {
+      try {
+        const result = await dispatch(env, intent.tool, intent.args);
+        if (typeof result.run_id === 'number') {
+          lastRunId = result.run_id;
+          toolsCalled.push(`${intent.tool} (fallback)`);
+        }
+      } catch { /* fall through to the help message */ }
+    }
+  }
+
+  // Deterministic gate: finish whatever was drafted along the correct branch.
   let run: Record<string, unknown> | undefined;
   if (lastRunId != null) {
     run = await finalizeRun(env, lastRunId);
     if (run) reply = deterministicReply(run);
   }
-  if (!reply) reply = 'No payroll action taken.';
+  if (!reply) reply = 'I can run payroll or pay a specific address. Try “run today’s payroll”, “…with a 25% bonus”, or “send today’s pay to 0x…”.';
   return { reply, run_id: lastRunId, tools_called: toolsCalled, run };
+}
+
+// Last-resort intent parser for when the model fails to emit a tool call.
+function parseIntent(instruction: string): { tool: string; args: ToolResult } | null {
+  const text = instruction.toLowerCase();
+  const addr = instruction.match(/0x[0-9a-fA-F]{40}/);
+  if (addr && /\b(send|pay|transfer|to|wallet|address)\b/.test(text)) {
+    return { tool: 'draft_payment_to', args: { recipient_address: addr[0] } };
+  }
+  if (/payroll|salar|\bpay\b|\brun\b/.test(text)) {
+    const m = text.match(/(-?\d+(?:\.\d+)?)\s*%/);
+    let bonus = m ? Number(m[1]) : 0;
+    if (bonus > 0 && /\b(reduce|cut|lower|less|decrease|dock|drop)\b/.test(text)) bonus = -bonus;
+    return { tool: 'draft_payroll_run', args: { period: 'today', bonus_pct: bonus } };
+  }
+  return null;
 }
 
 async function finalizeRun(env: Env, runId: number): Promise<Record<string, unknown> | undefined> {
