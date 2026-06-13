@@ -50,9 +50,11 @@ export async function sealTransfer(
     token,
     amount,
   } as Parameters<typeof client.transfer>[0]);
-  const result = await tx.wait();
-  if ((result as { status?: string }).status === 'failed') {
+  const result = (await tx.wait()) as { status?: string; txHash?: string; txId?: string };
+  if (result.status === 'failed') {
     throw new Error(`unlink transfer failed: ${JSON.stringify(result).slice(0, 300)}`);
   }
-  return { ref: (tx as unknown as { id?: string }).id ?? JSON.stringify(result).slice(0, 80) };
+  // The on-chain hash of the sealed transfer — verifiable on ArcScan as a
+  // privacy-pool interaction, with amount and counterparty unreadable.
+  return { ref: result.txHash ?? result.txId ?? 'sealed' };
 }
