@@ -327,7 +327,10 @@ export async function runAgent(env: Env, instruction: string): Promise<AgentOutc
       if (typeof result.run_id === 'number') lastRunId = result.run_id;
       messages.push({ role: 'tool', name, content: JSON.stringify(result) });
     }
-    if (lastRunId != null && (await isTerminal(env, lastRunId))) break;
+    // Once a run is drafted, the deterministic engine finishes it (policy +
+    // execute/approve/reject). No need for more model round-trips — break here
+    // so the agent answers after a single inference instead of looping.
+    if (lastRunId != null) break;
   }
 
   // Deterministic gate: finish whatever the model drafted along the correct
@@ -339,13 +342,6 @@ export async function runAgent(env: Env, instruction: string): Promise<AgentOutc
   }
   if (!reply) reply = 'No payroll action taken.';
   return { reply, run_id: lastRunId, tools_called: toolsCalled, run };
-}
-
-async function isTerminal(env: Env, runId: number): Promise<boolean> {
-  const row = await env.DB.prepare('SELECT status FROM payroll_runs WHERE id = ?')
-    .bind(runId)
-    .first<{ status: string }>();
-  return !!row && ['sealed', 'failed', 'pending_approval'].includes(row.status);
 }
 
 async function finalizeRun(env: Env, runId: number): Promise<Record<string, unknown> | undefined> {
