@@ -60,7 +60,7 @@
 
   /* layout — agent on top (primary), treasury + audit below */
   main { display: flex; flex-direction: column; gap: 1.1rem; }
-  .row-2 { display: grid; grid-template-columns: 1fr 1.18fr; gap: 1.1rem; align-items: start; }
+  .row-2 { display: grid; grid-template-columns: 0.9fr 1.3fr; gap: 1.1rem; align-items: start; }
   .card { background: #fff; border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); padding: 1.2rem 1.3rem; min-width: 0; }
   .card > h2 { font-family: var(--mono); font-size: .7rem; text-transform: uppercase; letter-spacing: .15em; color: var(--khaki);
                font-weight: 500; padding-bottom: .7rem; border-bottom: 1px solid var(--line); margin-bottom: 1rem;
@@ -126,13 +126,13 @@
   .explorer-links a { font-family: var(--mono); font-size: .7rem; color: var(--khaki); text-decoration: none; white-space: nowrap; }
   .explorer-links a:hover { color: var(--ink); text-decoration: underline; }
 
-  /* roster */
-  .roster-head { display: flex; align-items: center; justify-content: space-between; margin-top: 1.3rem; padding-bottom: .35rem; border-bottom: 1px solid var(--line); }
+  /* team roster */
   table { width: 100%; border-collapse: collapse; font-size: .82rem; }
-  #employees td { padding: .45rem .15rem; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  #employees { font-size: .85rem; }
+  #employees td { padding: .62rem .3rem; border-bottom: 1px solid var(--line); vertical-align: middle; }
   #employees tr:last-child td { border-bottom: none; }
   #employees th { font-family: var(--mono); font-size: .6rem; text-transform: uppercase; letter-spacing: .07em;
-                  color: var(--khaki); font-weight: 500; text-align: left; padding: 0 .15rem .45rem; border-bottom: 1px solid var(--line); }
+                  color: var(--khaki); font-weight: 500; text-align: left; padding: 0 .3rem .55rem; border-bottom: 1px solid var(--line); }
   #employees .c { text-align: center; }
   #employees .r { text-align: right; }
   .amt { font-family: var(--mono); font-variant-numeric: tabular-nums; }
@@ -142,7 +142,8 @@
   .rate-input { width: 4.5rem; font-family: var(--mono); font-size: .78rem; padding: .2rem .35rem; border: 1px solid var(--line); border-radius: 5px; text-align: right; }
   .rm-btn { background: none; border: none; color: var(--stamp); font-size: 1rem; padding: 0 .3rem; cursor: pointer; line-height: 1; }
   .rm-btn:hover { background: none; }
-  #add-employee { display: flex; gap: .4rem; margin-top: .7rem; }
+  #add-employee { display: flex; gap: .4rem; margin-top: .9rem; padding-top: .7rem; border-top: 1px solid var(--line); }
+  #add-employee[hidden] { display: none; }
   #add-employee input { font-family: var(--mono); font-size: .75rem; padding: .35rem .45rem; border: 1px solid var(--line); border-radius: 5px; min-width: 0; }
   #add-employee .ae-name { flex: 1.4; }
   #add-employee .ae-rate { flex: .7; }
@@ -249,33 +250,32 @@
         <div id="treasury-sub"><div class="l1">sealed payroll balance</div><div class="l2">private USDC on Arc</div></div>
         <div id="nano-balance"></div>
         <div id="treasury-links" class="explorer-links"></div>
+      </section>
 
-        <div class="roster-head">
-          <span class="eyebrow">Team</span>
-          <button class="link-btn" id="manage-toggle">Manage</button>
-        </div>
+      <section class="card" id="team">
+        <h2>Team — daily payroll <button class="link-btn" id="manage-toggle">Manage</button></h2>
         <table id="employees"><tbody></tbody></table>
         <div id="add-employee" hidden>
           <input class="ae-name" id="ae-name" placeholder="Name" />
-          <input class="ae-rate" id="ae-rate" type="number" step="0.01" placeholder="$/day" />
+          <input class="ae-rate" id="ae-rate" type="number" step="0.01" placeholder="$ / day" />
           <button id="ae-add">Add</button>
         </div>
       </section>
-
-      <section class="card" id="audit">
-        <h2>Audit</h2>
-        <div class="audit-scroll">
-          <table id="audit-table">
-            <thead><tr><th>When</th><th>Actor</th><th>Action</th><th>Policy</th><th>Seal</th></tr></thead>
-            <tbody></tbody>
-          </table>
-        </div>
-        <a id="csv-link" class="envelope-btn" href="/api/audit.csv" title="Download the complete audit trail as CSV">
-          <span class="env-main">Get the envelope archive ↓</span>
-          <span class="env-sub">Download the full audit trail (CSV)</span>
-        </a>
-      </section>
     </div>
+
+    <section class="card" id="audit">
+      <h2>Audit</h2>
+      <div class="audit-scroll">
+        <table id="audit-table">
+          <thead><tr><th>When</th><th>Actor</th><th>Action</th><th>Policy</th><th>Seal</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <a id="csv-link" class="envelope-btn" href="/api/audit.csv" title="Download the complete audit trail as CSV">
+        <span class="env-main">Get the envelope archive ↓</span>
+        <span class="env-sub">Download the full audit trail (CSV)</span>
+      </a>
+    </section>
   </main>
 
   <footer>
