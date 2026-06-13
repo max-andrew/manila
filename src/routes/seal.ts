@@ -24,7 +24,7 @@ import type { Env } from '../env';
 
 export const FACILITATOR_TESTNET_URL = 'https://gateway-api-testnet.circle.com';
 export const SEAL_FEE_MICRO = 1000; // $0.001 per disbursement
-const ARC_NETWORK = `eip155:${ARC_TESTNET_CHAIN_ID}`;
+export const ARC_NETWORK = `eip155:${ARC_TESTNET_CHAIN_ID}`;
 
 type Requirements = {
   scheme: string;
@@ -36,22 +36,30 @@ type Requirements = {
   extra: Record<string, unknown>;
 };
 
-function facilitator() {
+export function facilitator() {
   return new BatchFacilitatorClient({ url: FACILITATOR_TESTNET_URL });
+}
+
+// The live Arc payment kind advertised by the facilitator, or null if Arc is
+// not currently offered. Shared with the readiness preflight.
+export async function arcKind(): Promise<Record<string, any> | null> {
+  const supported = await facilitator().getSupported();
+  return (
+    (supported.kinds as Array<Record<string, any>>).find(
+      (k) => k.network === ARC_NETWORK && k.extra?.verifyingContract
+    ) ?? null
+  );
 }
 
 // USDC address as the facilitator advertises it for this network — same
 // extractor Circle's own middleware uses (extra.assets, by symbol).
-function usdcAddressOf(kind: Record<string, any>): string | null {
+export function usdcAddressOf(kind: Record<string, any>): string | null {
   const assets = kind.extra?.assets as Array<{ symbol: string; address: string }> | undefined;
   return assets?.find((a) => a.symbol === 'USDC')?.address ?? null;
 }
 
 async function arcRequirements(env: Env): Promise<Requirements | null> {
-  const supported = await facilitator().getSupported();
-  const kind = (supported.kinds as Array<Record<string, any>>).find(
-    (k) => k.network === ARC_NETWORK && k.extra?.verifyingContract
-  );
+  const kind = await arcKind();
   if (!kind) return null;
   const asset = usdcAddressOf(kind);
   if (!asset) return null;
