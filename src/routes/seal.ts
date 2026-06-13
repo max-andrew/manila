@@ -40,14 +40,21 @@ function facilitator() {
   return new BatchFacilitatorClient({ url: FACILITATOR_TESTNET_URL });
 }
 
+// USDC address as the facilitator advertises it for this network — same
+// extractor Circle's own middleware uses (extra.assets, by symbol).
+function usdcAddressOf(kind: Record<string, any>): string | null {
+  const assets = kind.extra?.assets as Array<{ symbol: string; address: string }> | undefined;
+  return assets?.find((a) => a.symbol === 'USDC')?.address ?? null;
+}
+
 async function arcRequirements(env: Env): Promise<Requirements | null> {
   const supported = await facilitator().getSupported();
   const kind = (supported.kinds as Array<Record<string, any>>).find(
     (k) => k.network === ARC_NETWORK && k.extra?.verifyingContract
   );
   if (!kind) return null;
-  const asset =
-    kind.extra?.usdcAddress ?? kind.asset ?? '0x3600000000000000000000000000000000000000';
+  const asset = usdcAddressOf(kind);
+  if (!asset) return null;
   return {
     scheme: CIRCLE_BATCHING_SCHEME,
     network: ARC_NETWORK,
