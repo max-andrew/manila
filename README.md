@@ -7,6 +7,10 @@ For a century, salaries were private because they came in a sealed manila envelo
 
 > Built solo at ETHGlobal New York 2026.
 
+**Live:** [manila.maxwell-andrew.workers.dev](https://manila.maxwell-andrew.workers.dev) — the agent, policy engine, maker-checker approval, live treasury balance, and audit export run on the deployed URL. The full on-chain disbursement path (Dynamic-signed, Gateway-batched, Unlink-sealed) runs locally against the signing sidecar; see [Run it](#run-it).
+
+A real agent-driven payroll run has settled on Arc testnet — three salaries sealed as private Unlink transfers, e.g. tx [`0x1e76d25d…b15f4c`](https://testnet.arcscan.app/tx/0x1e76d25d2ceb8900649b1b30fe7e8bb99ca7dc6b20e840707501a905c5b15f4c) (amount and counterparty unreadable on the explorer — that's the point).
+
 ## Architecture
 
 ```mermaid
@@ -53,9 +57,13 @@ Beyond the core, two extensions deepen specific sponsor tracks:
 
 ## Privacy model
 
-Confidential to the public: payment amounts and counterparties (sealed via Unlink).
-Auditable to the employer: the complete run history, policy decisions, and settlement references (CSV export).
-That split — public confidentiality, private auditability — is the compliance-correct shape for payroll.
+Confidential to the public: payment amounts and counterparties. Each salary moves as a transfer between two `unlink1` accounts, which hides all four of sender, recipient, amount, and token on the explorer — only an opaque privacy-pool interaction is visible.
+
+Auditable to the employer: the complete run history, every policy decision, and the settlement references, exported as CSV ("open the envelope").
+
+That split — public confidentiality, private auditability — is the compliance-correct shape for payroll: salaries stay off the public ledger, while the employer keeps a full, exportable record.
+
+On arc-testnet the privacy pool settles a mock USDC token (`USDCm`) rather than native USDC — a testnet stand-in for the same flow; the architecture is token-agnostic (`UNLINK_TOKEN_ADDRESS`).
 
 ## Run it
 
@@ -108,9 +116,12 @@ Once green, "Run the June payroll" seals three real private transfers on Arc, se
 
 ## Known limitations
 
-- The Dynamic MPC signer runs in a Node sidecar (`sidecar/server.mjs`) because the SDK ships a native binary that can't load in Cloudflare Workers; for judging it runs alongside the Worker rather than fully on the edge.
+- The Dynamic MPC signer runs in a Node sidecar (`sidecar/server.mjs`) because the SDK ships a native binary that can't load in Cloudflare Workers. The deployed Worker reaches it over an authenticated channel; for judging, the live on-chain path runs locally (or with the sidecar tunnelled) while read endpoints and the agent run fully on the edge.
 - The agent runs on the best free function-calling model on Workers AI (Llama 3.3 70B). It reliably parses intent and drafts; the policy gate and execute/approve branch are deterministic on purpose, so model variance can't affect correctness or bypass a control.
+- On arc-testnet the sealed token is a mock USDC (`USDCm`) from Unlink's faucet, not native USDC (see Privacy model).
 - Demo amounts are dollars, not thousands, because the Arc faucet grants 20 USDC per address per 2h — every transaction is real testnet value.
+
+See [docs/FEEDBACK.md](docs/FEEDBACK.md) for honest per-sponsor DX feedback.
 
 ## AI assistance
 
