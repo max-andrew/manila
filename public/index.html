@@ -35,8 +35,10 @@
   .eyebrow { font-family: var(--mono); font-size: .64rem; text-transform: uppercase; letter-spacing: .16em; color: var(--khaki); font-weight: 500; }
 
   /* top bar */
-  .topbar { display: flex; align-items: center; justify-content: space-between;
-            padding-bottom: 1.25rem; border-bottom: 1px solid var(--line); }
+  .topbar { display: flex; align-items: center; justify-content: space-between; padding-bottom: .7rem; }
+  /* divider drawn as a very shallow envelope-flap V — a quiet nod to the motif */
+  .flap { display: block; width: 100%; height: 15px; }
+  .flap polyline { fill: none; stroke: var(--line); stroke-width: 1; }
   .brand { display: flex; align-items: center; gap: .65rem; text-decoration: none; }
   .logo { height: 50px; width: auto; display: block; }
   .wordmark { font-family: var(--sans); font-weight: 700; font-size: 1.55rem; color: var(--ink); letter-spacing: -.015em; }
@@ -215,6 +217,9 @@
       </a>
     </nav>
   </header>
+  <svg class="flap" viewBox="0 0 1200 15" preserveAspectRatio="none" aria-hidden="true">
+    <polyline points="0,1 600,13 1200,1" vector-effect="non-scaling-stroke" />
+  </svg>
 
   <section class="hero">
     <div>
