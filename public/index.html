@@ -4,110 +4,208 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Manila — the pay envelope, rebuilt onchain</title>
+<meta name="description" content="Confidential USDC payroll on Arc, operated by an AI agent. Amounts and counterparties sealed; a full audit trail for the employer.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect x='3' y='7' width='26' height='18' rx='2' fill='%23E0BE7E' stroke='%231F2430' stroke-width='1.5'/><path d='M4 8l12 9 12-9' fill='none' stroke='%231F2430' stroke-width='1.5'/><circle cx='16' cy='17' r='2.5' fill='%231F2430'/></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;450;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root {
-    --manila: #E0BE7E;   /* kraft — sealed badges + approval banner only */
+    --manila: #E0BE7E;   /* kraft — sealed badge + approval banner only */
     --ink:    #1F2430;   /* structural text and borders */
     --stamp:  #C0392B;   /* reserved for blocked / pending / over-policy */
     --paper:  #FAF6EE;   /* page background */
     --khaki:  #6B6253;   /* secondary text */
+    --line:   #E6DFD0;   /* hairlines on paper */
     --mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
-    --sans: -apple-system, 'Helvetica Neue', Arial, sans-serif;
+    --sans: 'Inter', -apple-system, 'Helvetica Neue', Arial, sans-serif;
+    --shadow: 0 1px 2px rgba(31,36,48,.05), 0 4px 16px rgba(31,36,48,.05);
   }
   * { box-sizing: border-box; margin: 0; }
-  body { background: var(--paper); color: var(--ink); font-family: var(--sans); padding: 2rem; }
-  header { display: flex; align-items: baseline; gap: 1rem; margin-bottom: 0.4rem; }
-  h1 { font-size: 1.5rem; letter-spacing: 0.02em; }
-  .tagline { color: var(--khaki); font-size: 0.9rem; }
-  .gh { margin-left: auto; align-self: center; color: var(--ink); line-height: 0; }
-  .gh svg { width: 22px; height: 22px; fill: currentColor; display: block; }
-  .gh:hover { color: var(--khaki); }
-  main { display: grid; grid-template-columns: 1fr 1.3fr 1.3fr; gap: 1rem; margin-top: 1.5rem; }
-  section { border: 1.5px solid var(--ink); background: #fff; padding: 1rem; min-height: 18rem; }
-  section h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.12em;
-               border-bottom: 1.5px solid var(--ink); padding-bottom: 0.5rem; margin-bottom: 0.75rem; }
-  .num, .mono, table, #chat-log { font-family: var(--mono); }
+  html { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+  body { background: var(--paper); color: var(--ink); font-family: var(--sans);
+         line-height: 1.5; font-size: 15px; }
+  .wrap { max-width: 1140px; margin: 0 auto; padding: 1.5rem 1.5rem 3rem; }
+  a { color: inherit; }
+  .num, .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
   .muted { color: var(--khaki); }
-  table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
-  th, td { text-align: left; padding: 0.35rem 0.5rem; border-bottom: 1px solid #e5dfd2; }
-  th { color: var(--khaki); font-weight: 500; }
-  .badge { font-family: var(--mono); font-size: 0.68rem; letter-spacing: 0.14em; padding: 0.15rem 0.45rem; }
-  .badge.sealed { background: var(--manila); color: var(--khaki); transform: rotate(-1.5deg); display: inline-block; }
+
+  /* top bar */
+  .topbar { display: flex; align-items: center; justify-content: space-between;
+            padding-bottom: 1.25rem; border-bottom: 1px solid var(--line); }
+  .logo { height: 62px; width: auto; display: block; }
+  .topbar nav { display: flex; align-items: center; gap: 1rem; }
+  .chain { font-family: var(--mono); font-size: .72rem; letter-spacing: .04em; color: var(--khaki);
+           border: 1px solid var(--line); border-radius: 999px; padding: .25rem .6rem;
+           display: inline-flex; align-items: center; gap: .4rem; background: #fff; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ink); display: inline-block; }
+  .dot.live { background: #4f7a52; }
+  .dot.err { background: var(--stamp); }
+  .gh { color: var(--ink); line-height: 0; opacity: .8; }
+  .gh:hover { opacity: 1; }
+  .gh svg { width: 22px; height: 22px; fill: currentColor; display: block; }
+
+  /* intro */
+  .intro { padding: 2.25rem 0 1.75rem; max-width: 760px; }
+  .intro h1 { font-size: 2rem; font-weight: 700; letter-spacing: -0.02em; line-height: 1.15; }
+  .intro p { margin-top: .9rem; color: var(--khaki); font-size: 1.02rem; }
+  .intro b { color: var(--ink); font-weight: 600; }
+
+  /* exhibit */
+  figure.exhibit { background: #fff; border: 1px solid var(--line); border-radius: 10px;
+                   box-shadow: var(--shadow); padding: 1.25rem; margin-bottom: 1.75rem; }
+  figure.exhibit img { width: 100%; max-width: 680px; height: auto; display: block; margin: 0 auto; }
+  figure.exhibit figcaption { text-align: center; color: var(--khaki); font-size: .82rem; margin-top: .9rem; }
+
+  /* app grid */
+  main { display: grid; grid-template-columns: 0.9fr 1.25fr 1.35fr; gap: 1.1rem; align-items: start; }
+  .card { background: #fff; border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow);
+          padding: 1.15rem 1.2rem; }
+  .card > h2 { font-size: .7rem; text-transform: uppercase; letter-spacing: .15em; color: var(--khaki);
+               font-weight: 600; padding-bottom: .7rem; border-bottom: 1px solid var(--line); margin-bottom: .9rem; }
+
+  /* treasury */
+  #treasury-balance { font-family: var(--mono); font-size: 2.1rem; letter-spacing: -.01em; margin: .1rem 0 .15rem; }
+  #treasury-sub { font-size: .78rem; }
+  table { width: 100%; border-collapse: collapse; font-size: .8rem; margin-top: 1rem; }
+  th, td { text-align: left; padding: .4rem .15rem; border-bottom: 1px solid var(--line); }
+  th { color: var(--khaki); font-weight: 500; font-size: .68rem; text-transform: uppercase; letter-spacing: .08em; }
+  td.amt, td .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  tbody tr:last-child td { border-bottom: none; }
+
+  /* agent */
+  #chat-log { min-height: 7.5rem; max-height: 13rem; overflow-y: auto; display: flex; flex-direction: column; gap: .55rem; }
+  .msg { max-width: 92%; font-size: .82rem; line-height: 1.45; padding: .45rem .65rem; border-radius: 9px; }
+  .msg.you { align-self: flex-end; background: var(--ink); color: #fff; border-bottom-right-radius: 2px; }
+  .msg.agent { align-self: flex-start; background: var(--paper); border: 1px solid var(--line);
+               font-family: var(--mono); border-bottom-left-radius: 2px; }
+  .msg.agent.think { color: var(--khaki); font-style: italic; }
+  .placeholder { color: var(--khaki); font-size: .82rem; }
+  .chips { display: flex; flex-wrap: wrap; gap: .4rem; margin: .9rem 0 .6rem; }
+  .chip { font-family: var(--mono); font-size: .7rem; color: var(--khaki); background: #fff;
+          border: 1px solid var(--line); border-radius: 999px; padding: .25rem .6rem; cursor: pointer; }
+  .chip:hover { border-color: var(--ink); color: var(--ink); }
+  #chat-form { display: flex; gap: .5rem; }
+  #chat-input { flex: 1; font-family: var(--mono); font-size: .82rem; padding: .5rem .6rem;
+                border: 1px solid var(--ink); border-radius: 7px; background: #fff; color: var(--ink); }
+  #chat-input:focus { outline: 2px solid rgba(31,36,48,.15); outline-offset: 1px; }
+  button { font-family: var(--mono); font-size: .74rem; letter-spacing: .04em; cursor: pointer;
+           padding: .5rem .85rem; border: 1px solid var(--ink); border-radius: 7px; background: var(--ink); color: #fff; }
+  button:hover { background: #2c3340; }
+  button:disabled { opacity: .45; cursor: default; }
+
+  /* approval banner — the manila envelope flap */
+  #approval-banner { background: var(--manila); border: 1px solid var(--ink); border-radius: 9px;
+                     padding: .8rem .9rem; margin-bottom: .9rem; font-size: .85rem; color: var(--ink); }
+  #approval-banner .who { font-weight: 600; }
+  #approval-banner button { background: var(--paper); color: var(--ink); margin-top: .55rem; }
+  #approval-banner button:hover { background: #fff; }
+
+  /* badges */
+  .badge { font-family: var(--mono); font-size: .64rem; letter-spacing: .16em; padding: .12rem .4rem;
+           border-radius: 3px; display: inline-block; }
+  .badge.sealed { background: var(--manila); color: #5a4a2c; transform: rotate(-2deg); border: 1px solid #b9914f; }
   .badge.pending { color: var(--stamp); border: 1.5px solid var(--stamp); }
   .badge.released { color: #fff; background: var(--ink); }
-  #treasury-balance { font-size: 1.8rem; margin: 0.5rem 0; }
-  footer { margin-top: 1.5rem; color: var(--khaki); font-size: 0.75rem; }
-  #chat-log { margin-bottom: 0.75rem; max-height: 11rem; overflow-y: auto; }
-  .msg { font-size: 0.8rem; margin: 0.3rem 0; line-height: 1.4; }
-  .msg.you { color: var(--khaki); }
-  .msg.agent { color: var(--ink); }
-  .msg .who { font-family: var(--sans); text-transform: uppercase; letter-spacing: 0.1em;
-              font-size: 0.6rem; color: var(--khaki); margin-right: 0.4rem; }
-  #chat-form { display: flex; gap: 0.5rem; }
-  #chat-input { flex: 1; font-family: var(--mono); font-size: 0.8rem; padding: 0.4rem 0.5rem;
-                border: 1.5px solid var(--ink); background: #fff; color: var(--ink); }
-  button { font-family: var(--mono); font-size: 0.75rem; letter-spacing: 0.06em; cursor: pointer;
-           padding: 0.4rem 0.8rem; border: 1.5px solid var(--ink); background: var(--ink); color: #fff; }
-  button:disabled { opacity: 0.5; cursor: default; }
-  #approval-banner { background: var(--manila); border: 1.5px solid var(--ink); padding: 0.6rem 0.75rem;
-                     margin-bottom: 0.75rem; font-size: 0.8rem; }
-  #approval-banner .badge { margin-bottom: 0.4rem; display: inline-block; }
-  #approval-banner button { background: var(--paper); color: var(--ink); margin-top: 0.4rem; }
-  #csv-link { font-family: var(--mono); font-size: 0.72rem; color: var(--ink); display: inline-block;
-              margin-top: 0.75rem; }
-  .seal a { font-family: var(--mono); font-size: 0.72rem; color: var(--khaki); text-decoration: none; }
+
+  /* audit */
+  #audit-table { font-size: .76rem; }
+  .seal a { font-family: var(--mono); font-size: .72rem; color: var(--khaki); text-decoration: none; white-space: nowrap; }
   .seal a:hover { color: var(--ink); }
+  .envelope-btn { display: inline-flex; align-items: center; gap: .4rem; margin-top: 1rem;
+                  background: #fff; color: var(--ink); border: 1px solid var(--ink); font-size: .72rem; }
+  .envelope-btn:hover { background: var(--paper); }
+
+  /* footer */
+  footer { margin-top: 2.5rem; padding-top: 1.1rem; border-top: 1px solid var(--line);
+           display: flex; flex-wrap: wrap; gap: .5rem 1.25rem; align-items: center;
+           font-family: var(--mono); font-size: .72rem; color: var(--khaki); }
+  footer .stack { margin-left: auto; }
+
+  @media (max-width: 920px) {
+    main { grid-template-columns: 1fr; }
+    .intro h1 { font-size: 1.6rem; }
+  }
 </style>
 </head>
 <body>
-<header>
-  <h1>Manila</h1>
-  <span class="tagline">The pay envelope, rebuilt onchain.</span>
-  <a class="gh" href="https://github.com/max-andrew/manila" target="_blank" rel="noopener"
-     aria-label="View source on GitHub" title="View source on GitHub">
-    <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path></svg>
-  </a>
-</header>
+<div class="wrap">
 
-<main>
-  <section id="treasury">
-    <h2>Treasury</h2>
-    <div id="treasury-balance" class="num muted">—</div>
-    <div id="treasury-sub" class="muted" style="font-size:0.8rem">USDC on Arc testnet</div>
-    <table id="employees" style="margin-top:1rem">
-      <thead><tr><th>Employee</th><th>Salary</th></tr></thead>
-      <tbody></tbody>
-    </table>
+  <header class="topbar">
+    <img class="logo" src="/assets/manila_logo_lockup.png" alt="Manila — the pay envelope, rebuilt onchain">
+    <nav>
+      <span class="chain"><span class="dot" id="status-dot"></span><span id="status">connecting…</span></span>
+      <a class="gh" href="https://github.com/max-andrew/manila" target="_blank" rel="noopener"
+         aria-label="View source on GitHub" title="View source on GitHub">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path></svg>
+      </a>
+    </nav>
+  </header>
+
+  <section class="intro">
+    <h1>Confidential USDC payroll, operated by an agent.</h1>
+    <p>Under <b>1% of payroll</b> runs on stablecoins — because a public chain turns every salary into a permanent public record. Manila seals the envelope back up: an AI agent runs payroll from plain English, amounts and counterparties stay <b>sealed</b> on Arc, policy controls require a second signature over a cap, and the employer keeps a full, exportable audit trail.</p>
   </section>
 
-  <section id="agent">
-    <h2>Agent</h2>
-    <div id="approval-banner" hidden></div>
-    <div id="chat-log"><div class="muted" style="font-size:0.8rem">Awaiting instructions.</div></div>
-    <form id="chat-form" autocomplete="off">
-      <input id="chat-input" type="text" placeholder="Run June payroll"
-             value="Run June payroll with a 25% bonus" />
-      <button type="submit" id="chat-send">Send</button>
-    </form>
-  </section>
+  <figure class="exhibit">
+    <img src="/assets/manila_public_vs_sealed_comparison.png" alt="The same three salaries: fully public on a normal chain, sealed on Manila with an employer-only audit export.">
+    <figcaption>The same payroll run — public forever on a normal chain, sealed on Manila.</figcaption>
+  </figure>
 
-  <section id="audit">
-    <h2>Audit</h2>
-    <table id="audit-table">
-      <thead><tr><th>When</th><th>Actor</th><th>Action</th><th>Result</th><th>Seal</th></tr></thead>
-      <tbody></tbody>
-    </table>
-    <a id="csv-link" href="/api/audit.csv">Open the envelope (CSV)</a>
-  </section>
-</main>
+  <main>
+    <section class="card" id="treasury">
+      <h2>Treasury</h2>
+      <div id="treasury-balance" class="muted">—</div>
+      <div id="treasury-sub" class="muted">sealed USDC on Arc testnet</div>
+      <table id="employees">
+        <thead><tr><th>Employee</th><th style="text-align:right">Salary</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </section>
 
-<footer class="mono" id="status">connecting…</footer>
+    <section class="card" id="agent">
+      <h2>Agent</h2>
+      <div id="approval-banner" hidden></div>
+      <div id="chat-log"><div class="placeholder">Ask the agent to run payroll — it drafts the run, checks policy, and seals or holds for approval.</div></div>
+      <div class="chips" id="chips">
+        <span class="chip" data-msg="Run the June payroll">Run the June payroll</span>
+        <span class="chip" data-msg="Run June payroll with a 25% bonus">Run with a 25% bonus</span>
+        <span class="chip" data-msg="Process payroll for June">Rephrase it</span>
+      </div>
+      <form id="chat-form" autocomplete="off">
+        <input id="chat-input" type="text" placeholder="Run the June payroll" />
+        <button type="submit" id="chat-send">Send</button>
+      </form>
+    </section>
+
+    <section class="card" id="audit">
+      <h2>Audit</h2>
+      <table id="audit-table">
+        <thead><tr><th>When</th><th>Actor</th><th>Action</th><th>Policy</th><th>Seal</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <a id="csv-link" class="envelope-btn" href="/api/audit.csv">Open the envelope · CSV</a>
+    </section>
+  </main>
+
+  <footer>
+    <span>Manila</span>
+    <span class="muted">The pay envelope, rebuilt onchain.</span>
+    <span class="stack muted">Dynamic · Circle Gateway · Unlink · Arc · Workers AI</span>
+  </footer>
+
+</div>
 
 <script>
 const usd = (micro) => '$' + (Number(micro) / 1e6).toLocaleString('en-US', { minimumFractionDigits: 2 });
 const esc = (s) => String(s ?? '').replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
 const el = (id) => document.getElementById(id);
 const EXPLORER = 'https://testnet.arcscan.app/tx/';
+
+function setStatus(text, kind) {
+  el('status').textContent = text;
+  el('status-dot').className = 'dot' + (kind ? ' ' + kind : '');
+}
 
 // A sealed disbursement's tx_refs hold the on-chain hash; link it (amounts
 // stay hidden on the explorer — that's the point).
@@ -126,42 +224,50 @@ async function load() {
       fetch('/api/audit').then(r => r.json()),
       fetch('/api/treasury').then(r => r.json()).catch(() => null),
     ]);
-    el('status').textContent = health.ok ? 'manila · connected' : 'service degraded';
+    setStatus(health.ok ? 'Arc testnet · live' : 'degraded', health.ok ? 'live' : 'err');
 
     if (treasury?.sealed?.available) {
       el('treasury-balance').textContent = '$' + treasury.sealed.formatted;
       el('treasury-balance').classList.remove('muted');
       el('treasury-sub').textContent =
-        `sealed USDC · ${treasury.fees?.available ? '$' + treasury.fees.formatted + ' fee balance' : 'Arc testnet'}`;
+        'sealed USDC' + (treasury.fees?.available ? ` · $${treasury.fees.formatted} nanopayment balance` : ' on Arc testnet');
     }
 
     document.querySelector('#employees tbody').innerHTML = employees
-      .map(e => `<tr><td>${esc(e.name)}</td><td class="num">${usd(e.salary_micro)}</td></tr>`)
+      .map(e => `<tr><td>${esc(e.name)}</td><td class="amt" style="text-align:right">${usd(e.salary_micro)}</td></tr>`)
       .join('');
 
     document.querySelector('#audit-table tbody').innerHTML = audit.length
-      ? audit.map(a => `<tr><td>${esc(a.created_at)}</td><td>${esc(a.actor)}</td><td>${esc(a.action)}</td>
-          <td>${esc(a.policy_result ?? '')}</td><td class="seal">${sealCell(a.tx_refs)}</td></tr>`).join('')
+      ? audit.map(a => `<tr><td class="muted">${esc((a.created_at||'').slice(5,16))}</td><td>${esc(a.actor)}</td>
+          <td>${esc(a.action)}</td><td>${policyBadge(a.policy_result)}</td>
+          <td class="seal">${sealCell(a.tx_refs)}</td></tr>`).join('')
       : '<tr><td colspan="5" class="muted">No entries yet.</td></tr>';
 
     await refreshApproval();
   } catch (err) {
-    el('status').textContent = 'error: ' + err.message;
+    setStatus('error', 'err');
   }
 }
 
-function addMsg(who, text) {
+function policyBadge(r) {
+  if (r === 'pass') return '<span class="mono" style="color:var(--khaki)">pass</span>';
+  if (r === 'blocked') return '<span class="mono" style="color:var(--stamp)">blocked</span>';
+  return '';
+}
+
+function addMsg(who, text, cls) {
   const log = el('chat-log');
-  if (log.querySelector('.muted')) log.innerHTML = '';
+  const ph = log.querySelector('.placeholder');
+  if (ph) ph.remove();
   const div = document.createElement('div');
-  div.className = 'msg ' + (who === 'You' ? 'you' : 'agent');
-  div.innerHTML = `<span class="who">${who}</span>${esc(text)}`;
+  div.className = 'msg ' + (who === 'You' ? 'you' : 'agent') + (cls ? ' ' + cls : '');
+  div.textContent = text;
   log.appendChild(div);
   log.scrollTop = log.scrollHeight;
+  return div;
 }
 
 async function refreshApproval() {
-  // Surface the most recent run that is waiting for a second signature.
   const audit = await fetch('/api/audit').then(r => r.json()).catch(() => []);
   const pending = audit.find(a => a.action === 'approval_requested');
   const released = audit.find(a => a.action === 'approved' || a.action === 'run_sealed' || a.action === 'run_failed');
@@ -170,7 +276,7 @@ async function refreshApproval() {
     let reason = '';
     try { reason = JSON.parse(pending.detail).reason || ''; } catch {}
     banner.innerHTML = `<span class="badge pending">PENDING APPROVAL</span>
-      <div>Run ${pending.run_id} needs a second signature. ${esc(reason)}</div>
+      <div style="margin:.5rem 0 .1rem"><span class="who">Run ${pending.run_id}</span> needs a second signature on the envelope. ${esc(reason)}</div>
       <button data-run="${pending.run_id}">Add second signature</button>`;
     banner.hidden = false;
     banner.querySelector('button').onclick = approve;
@@ -196,28 +302,36 @@ async function approve(e) {
   await load();
 }
 
-el('chat-form').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const input = el('chat-input');
-  const message = input.value.trim();
+async function sendMessage(message) {
   if (!message) return;
   addMsg('You', message);
-  input.value = '';
+  el('chat-input').value = '';
   const send = el('chat-send');
   send.disabled = true; send.textContent = '…';
+  const thinking = addMsg('Agent', 'drafting…', 'think');
   try {
     const res = await fetch('/api/agent', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ message }),
     });
     const data = await res.json();
+    thinking.remove();
     addMsg('Agent', data.reply || data.error || 'No response.');
   } catch (err) {
+    thinking.remove();
     addMsg('Agent', 'Error: ' + err.message);
   }
   send.disabled = false; send.textContent = 'Send';
   await load();
+}
+
+el('chat-form').addEventListener('submit', (e) => {
+  e.preventDefault();
+  sendMessage(el('chat-input').value.trim());
+});
+el('chips').addEventListener('click', (e) => {
+  const chip = e.target.closest('.chip');
+  if (chip) sendMessage(chip.dataset.msg);
 });
 
 load();
