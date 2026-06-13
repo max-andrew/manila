@@ -11,6 +11,12 @@
     "@unlink-xyz/sdk/admin": "./node_modules/@unlink-xyz/sdk/dist/admin/index.js"
   },
   "assets": { "directory": "./public", "binding": "ASSETS" },
+  // The agent brain runs on Workers AI — no external LLM key. Llama 3.3 (fp8)
+  // is the most reliable function-caller of the free models and drives the
+  // demo well; @cf/nvidia/nemotron-3-120b-a12b is the alternative to try for
+  // richer multi-tool trajectories (same messages+tools API).
+  "ai": { "binding": "AI" },
+  "vars": { "AGENT_MODEL": "@cf/meta/llama-3.3-70b-instruct-fp8-fast" },
   "d1_databases": [
     {
       "binding": "DB",

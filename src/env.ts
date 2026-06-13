@@ -1,8 +1,10 @@
 export type Env = {
   DB: D1Database;
   ASSETS: Fetcher;
+  AI: Ai;
+  // The Workers AI model that powers the agent (overridable; see wrangler.jsonc):
+  AGENT_MODEL: string;
   // Secrets — .dev.vars locally, `wrangler secret put` in prod:
-  ANTHROPIC_API_KEY: string;
   DYNAMIC_API_KEY: string;
   DYNAMIC_ENV_ID: string;
   UNLINK_API_KEY: string;

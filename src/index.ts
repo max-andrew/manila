@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import type { Env } from './env';
 import { sealApp } from './routes/seal';
 import { disburseApp } from './routes/disburse';
+import { agentApp } from './routes/agent';
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -34,11 +35,7 @@ app.get('/api/audit', async (c) => {
 
 app.route('/api', sealApp);
 app.route('/api', disburseApp);
-
-// Implemented in M2 — explicit 501s so the UI can wire against real routes now.
-app.post('/api/agent', (c) => c.json({ error: 'not implemented yet (M2)' }, 501));
-app.post('/api/approve/:id', (c) => c.json({ error: 'not implemented yet (M2)' }, 501));
-app.get('/api/audit.csv', (c) => c.json({ error: 'not implemented yet (M2)' }, 501));
+app.route('/api', agentApp);
 
 app.onError((err, c) => {
   console.error(err);

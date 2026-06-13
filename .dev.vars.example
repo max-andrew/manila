@@ -1,8 +1,9 @@
 # Copy to .dev.vars for local dev; set in prod with `wrangler secret put <NAME>`.
 # .dev.vars is gitignored — never commit real values.
 
-# Anthropic — agent brain (claude-sonnet-4-6 tool-use)
-ANTHROPIC_API_KEY=
+# The agent brain runs on Cloudflare Workers AI (the `AI` binding) — no LLM key
+# needed. The model is set as a var in wrangler.jsonc (AGENT_MODEL); local dev
+# proxies to Cloudflare, so you only need to be `wrangler login`'d.
 
 # Dynamic — server wallet / delegated access for the agent
 DYNAMIC_API_KEY=

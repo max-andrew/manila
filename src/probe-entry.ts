@@ -22,10 +22,7 @@ export default {
       if (!account.address) throw new Error('no address');
     });
 
-    await probe('anthropic', async () => {
-      const { default: Anthropic } = await import('@anthropic-ai/sdk');
-      new Anthropic({ apiKey: 'probe-not-a-key' });
-    });
+    // The agent brain uses the Workers AI `AI` binding (no SDK import to probe).
 
     // @dynamic-labs-wallet/node-evm confirmed NOT Workers-compatible: it
     // requires a native .node MPC binary. Signing runs in a Node sidecar instead.
