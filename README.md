@@ -48,12 +48,13 @@ Each integration is load-bearing — remove it and the product stops working, no
 - **Unlink** (joint Private Nanopayments) — every salary is sealed: each disbursement is an Unlink private transfer, so amounts and counterparties are unreadable on ArcScan (`src/lib/unlink.ts`, `src/routes/seal.ts`). This is the product's whole reason to exist; without it, payroll is public.
 - **Circle Gateway + Arc** (Best Agentic Economy, joint Private Nanopayments) — disbursements are metered as x402 nanopayments and netted by Circle Gateway into one batched, gas-free settlement on Arc testnet (`src/routes/seal.ts`, `src/routes/disburse.ts`). The agent paying per-call for each sealed disbursement is exactly the agent-to-service commerce pattern the Agentic Economy track is for.
 
+## Programmable vesting (Arc)
+
+Beyond the sealed default path, an employee on a vesting plan can be paid through [`PayrollVault`](contracts/README.md) — a Solidity contract deployed on Arc with cliff + linear USDC vesting, funded once by the employer and `release()`d by the agent wallet as funds vest, each release a real USDC transfer logged to the same audit trail. Deployed at [`0x2f217B2A…60Ac`](https://testnet.arcscan.app/address/0x2f217B2A62826F247084B207106233E5F67c60Ac).
+
 ## Roadmap
 
-Beyond the core, two extensions deepen specific sponsor tracks:
-
-- **Flow-funded treasury** (Dynamic, Best Use of Flow) — fund the treasury with any supported token and settle to USDC, with a webhook marking the treasury funded. Gated on Flow testnet availability.
-- **On-chain vesting vault** (Arc, Advanced Stablecoin Logic) — a `PayrollVault` Solidity contract on Arc with scheduled USDC releases (cliff + linear), the agent wallet calling `release()`, events feeding the same audit trail — routing at least one employee's pay through programmable on-chain logic.
+- **Flow-funded treasury** (Dynamic, Best Use of Flow) — fund the treasury with any supported token and settle to USDC, with a webhook marking the treasury funded. Gated on Flow testnet availability (currently enterprise-only).
 
 ## Privacy model
 
@@ -104,7 +105,8 @@ Once green, "Run the June payroll" seals three real private transfers on Arc, se
 - **Dynamic — Best Agentic Build** — the agent uses a Dynamic server wallet to sign and execute on-chain disbursements, deciding then executing under maker-checker controls.
 - **Dynamic — Best Money App** — confidential USDC payroll: a real money-movement app built on a Dynamic SDK.
 - **Arc — Best Agentic Economy with Circle Agent Stack** — an agent paying gas-free per-disbursement nanopayments on Arc; frontend + backend + this README's architecture.
-- *(Roadmap)* **Dynamic — Best Use of Flow** and **Arc — Advanced Stablecoin Logic**, per the Roadmap section.
+- **Arc — Advanced Stablecoin Logic** — a deployed [`PayrollVault`](contracts/README.md) on Arc: programmable cliff + linear USDC vesting, agent-released, with a real vest + release on-chain.
+- *(Roadmap)* **Dynamic — Best Use of Flow** — see Roadmap.
 
 ## Demo script (90 seconds)
 
