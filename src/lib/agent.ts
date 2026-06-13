@@ -1,12 +1,12 @@
 // The agent brain. A single tool-use loop over Workers AI (no agent
 // framework, no external LLM key — the model runs on Cloudflare's `AI`
 // binding). The model is the router: it reads a plain-English instruction and
-// decides which tools to call, in order. The tools do the real work against
-// D1 and the M1 money path; the route derives the user-facing outcome from
-// what the tools actually did, so the demo is correct even if a smaller free
-// model phrases its reply loosely.
+// decides which tools to call. The tools do the real work against D1 and the
+// money path; the policy gate and the pass/review/reject branch are
+// deterministic, so the demo is correct — and a control can't be talked past —
+// regardless of how a smaller free model phrases things.
 
-import { evaluatePolicy, loadPolicy } from './policy';
+import { evaluatePolicy, loadPolicy, type PolicyResult } from './policy';
 import { audit } from './audit';
 import { microToUsd } from './arc';
 import { executeRun } from '../routes/disburse';
@@ -14,16 +14,17 @@ import type { Env } from '../env';
 
 export const DEFAULT_AGENT_MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
 
-const SYSTEM_PROMPT = `You are the payroll agent for Manila, a confidential USDC payroll system.
-You operate the company's payroll by calling tools. Never invent amounts, names, or results — the tools read the real employee roster and policy from the database.
+const SYSTEM_PROMPT = `You are the payroll agent for Manila — confidential USDC payroll that pays the team DAILY, not monthly. Gas-free nanopayments make per-day payroll practical.
+Operate payroll by calling tools. Never invent amounts, names, addresses, or results — the tools read the real roster and policy from the database.
 
-For an instruction like "run June payroll" (optionally "with a 10% bonus"):
-1. Call draft_payroll_run with the period and any bonus percentage.
-2. Call check_policy with the returned run_id.
-3. If the policy result pass is true, call execute_run with the run_id.
-4. If pass is false, call request_approval with the run_id and a short reason — do NOT execute. A human adds the second signature.
+To run payroll (e.g. "run today's payroll", optionally "with a 10% bonus"):
+1. Call draft_payroll_run with the period (default today) and any bonus percentage.
+2. Call check_policy with the run_id.
+3. If verdict is "pass", call execute_run. If "review", call request_approval — a human adds a second signature. If "rejected", stop — the run is refused.
 
-Call one tool at a time and wait for its result. When finished, reply in one or two terse sentences, lowercase, no exclamation points. Money is sealed, never "sent" or "private".`;
+To pay a specific address (e.g. "send today's pay to 0x..."), call draft_payment_to, then check_policy. Recipients not on the payroll allowlist are rejected.
+
+Call one tool at a time and wait for its result. Reply in one or two terse lowercase sentences, no exclamation points. Money is "sealed", never "sent" or "private".`;
 
 type ToolResult = Record<string, unknown>;
 
@@ -31,23 +32,36 @@ const TOOLS = [
   {
     name: 'draft_payroll_run',
     description:
-      'Draft a payroll run from the employee roster in the database. Returns run_id, employee_count and total_micro (USDC base units, 6 decimals).',
+      "Draft a daily payroll run from the employee roster. Returns run_id and total_micro (USDC base units, 6 decimals).",
     parameters: {
       type: 'object',
       properties: {
-        period: { type: 'string', description: "Pay period, e.g. '2026-06' or 'June'." },
+        period: { type: 'string', description: "Pay day, default 'today'. Also accepts a date like '2026-06-13'." },
         bonus_pct: {
           type: 'number',
-          description: 'Optional uniform bonus percentage applied to every salary, e.g. 20 for +20%. Default 0.',
+          description: 'Optional uniform pay adjustment percent, e.g. 20 for +20%, -10 for a 10% reduction. Default 0.',
         },
       },
-      required: ['period'],
+      required: [],
+    },
+  },
+  {
+    name: 'draft_payment_to',
+    description:
+      "Draft an ad-hoc payment to a specific recipient address (for requests like 'send today's pay to 0x...'). Returns run_id. The recipient is checked against the payroll allowlist by check_policy.",
+    parameters: {
+      type: 'object',
+      properties: {
+        recipient_address: { type: 'string', description: 'The destination address (0x...).' },
+        amount_usd: { type: 'number', description: 'Amount in USD. Defaults to the day’s total payroll if omitted.' },
+      },
+      required: ['recipient_address'],
     },
   },
   {
     name: 'check_policy',
     description:
-      'Evaluate a drafted run against the per-run cap and recipient allowlist. Returns pass (boolean) and reasons.',
+      'Evaluate a drafted run against the treasury controls (cap, hard ceiling, pay band, allowlist). Returns verdict: "pass", "review", or "rejected", plus reasons.',
     parameters: {
       type: 'object',
       properties: { run_id: { type: 'number' } },
@@ -57,7 +71,7 @@ const TOOLS = [
   {
     name: 'execute_run',
     description:
-      'Execute a run whose policy check passed: seal each salary as a private transfer, settled via batched nanopayments. Only call when check_policy returned pass true.',
+      'Execute a run whose policy verdict is "pass": seal each salary as a private transfer, settled via batched nanopayments. Only call on verdict "pass".',
     parameters: {
       type: 'object',
       properties: { run_id: { type: 'number' } },
@@ -67,7 +81,7 @@ const TOOLS = [
   {
     name: 'request_approval',
     description:
-      'Halt a run that failed policy and route it for a second human signature. Call this instead of execute_run when check_policy returned pass false.',
+      'Route a run with verdict "review" for a second human signature. Do NOT call for "rejected" runs.',
     parameters: {
       type: 'object',
       properties: {
@@ -79,29 +93,36 @@ const TOOLS = [
   },
 ];
 
+function todayISO(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
 function normalizePeriod(raw: string): string {
+  const key = (raw ?? '').trim().toLowerCase();
+  if (!key || ['today', 'daily', 'now', 'this day'].includes(key)) return todayISO();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw) || /^\d{4}-\d{2}$/.test(raw)) return raw;
   const months: Record<string, string> = {
     january: '01', february: '02', march: '03', april: '04', may: '05', june: '06',
     july: '07', august: '08', september: '09', october: '10', november: '11', december: '12',
   };
-  if (/^\d{4}-\d{2}$/.test(raw)) return raw;
-  const key = raw.trim().toLowerCase();
   if (months[key]) return `2026-${months[key]}`;
-  return raw;
+  return raw || todayISO();
+}
+
+async function rosterTotal(env: Env, multiplier = 1): Promise<{ total: number; count: number }> {
+  const { results } = await env.DB.prepare('SELECT salary_micro FROM employees').all<{ salary_micro: number }>();
+  const total = results.reduce((sum, e) => sum + Math.round(e.salary_micro * multiplier), 0);
+  return { total, count: results.length };
 }
 
 async function draftPayrollRun(env: Env, args: ToolResult): Promise<ToolResult> {
-  const period = normalizePeriod(String(args.period ?? ''));
+  const period = normalizePeriod(String(args.period ?? 'today'));
   const bonusPct = Number(args.bonus_pct ?? 0) || 0;
   const multiplier = 1 + bonusPct / 100;
 
-  const { results: employees } = await env.DB.prepare(
-    'SELECT salary_micro FROM employees'
-  ).all<{ salary_micro: number }>();
-  if (!employees.length) throw new Error('no employees on the roster');
-
-  const total = employees.reduce((sum, e) => sum + Math.round(e.salary_micro * multiplier), 0);
-  const note = bonusPct ? `${bonusPct}% bonus` : null;
+  const { total, count } = await rosterTotal(env, multiplier);
+  if (!count) throw new Error('no employees on the roster');
+  const note = bonusPct ? `${bonusPct > 0 ? '+' : ''}${bonusPct}% adjustment` : null;
 
   const run = await env.DB.prepare(
     "INSERT INTO payroll_runs (period, status, amount_multiplier, total_micro, requested_by, note) VALUES (?, 'draft', ?, ?, 'agent', ?) RETURNING id"
@@ -114,28 +135,55 @@ async function draftPayrollRun(env: Env, args: ToolResult): Promise<ToolResult> 
     actor: 'agent',
     action: 'run_drafted',
     run_id: run.id,
-    detail: { period, bonus_pct: bonusPct, employee_count: employees.length, total_micro: total },
+    detail: { period, bonus_pct: bonusPct, employee_count: count, total_micro: total },
   });
-  return {
+  return { run_id: run.id, period, employee_count: count, bonus_pct: bonusPct, total_micro: total, total_usd: microToUsd(total) };
+}
+
+async function draftPaymentTo(env: Env, args: ToolResult): Promise<ToolResult> {
+  const recipient = String(args.recipient_address ?? '').trim();
+  if (!recipient) throw new Error('recipient_address required');
+  const amountMicro =
+    args.amount_usd != null ? Math.round(Number(args.amount_usd) * 1e6) : (await rosterTotal(env)).total;
+
+  const run = await env.DB.prepare(
+    "INSERT INTO payroll_runs (period, status, amount_multiplier, total_micro, requested_by, note, custom_recipient) VALUES (?, 'draft', 1.0, ?, 'agent', ?, ?) RETURNING id"
+  )
+    .bind(normalizePeriod('today'), amountMicro, `ad-hoc payment to ${recipient}`, recipient)
+    .first<{ id: number }>();
+  if (!run) throw new Error('failed to create run');
+
+  await audit(env.DB, {
+    actor: 'agent',
+    action: 'payment_drafted',
     run_id: run.id,
-    period,
-    employee_count: employees.length,
-    bonus_pct: bonusPct,
-    total_micro: total,
-    total_usd: microToUsd(total),
-  };
+    detail: { recipient, total_micro: amountMicro },
+  });
+  return { run_id: run.id, recipient, total_micro: amountMicro, total_usd: microToUsd(amountMicro) };
 }
 
 async function checkPolicy(env: Env, args: ToolResult): Promise<ToolResult> {
   const runId = Number(args.run_id);
-  const run = await env.DB.prepare('SELECT total_micro FROM payroll_runs WHERE id = ?')
+  const run = await env.DB.prepare(
+    'SELECT total_micro, amount_multiplier, custom_recipient FROM payroll_runs WHERE id = ?'
+  )
     .bind(runId)
-    .first<{ total_micro: number }>();
+    .first<{ total_micro: number; amount_multiplier: number; custom_recipient: string | null }>();
   if (!run) throw new Error(`run ${runId} not found`);
 
-  const { results: employees } = await env.DB.prepare('SELECT wallet FROM employees').all<{ wallet: string }>();
+  let recipients: string[];
+  let bonusPct: number;
+  if (run.custom_recipient) {
+    recipients = [run.custom_recipient];
+    bonusPct = 0;
+  } else {
+    const { results } = await env.DB.prepare('SELECT wallet FROM employees').all<{ wallet: string }>();
+    recipients = results.map((e) => e.wallet);
+    bonusPct = Math.round((Number(run.amount_multiplier) - 1) * 100);
+  }
+
   const policy = await loadPolicy(env);
-  const result = evaluatePolicy(Number(run.total_micro), employees.map((e) => e.wallet), policy);
+  const result = evaluatePolicy(Number(run.total_micro), bonusPct, recipients, policy);
 
   await env.DB.prepare('UPDATE payroll_runs SET policy_result = ? WHERE id = ?')
     .bind(JSON.stringify(result), runId)
@@ -145,7 +193,7 @@ async function checkPolicy(env: Env, args: ToolResult): Promise<ToolResult> {
     action: 'policy_check',
     run_id: runId,
     detail: result,
-    policy_result: result.pass ? 'pass' : 'blocked',
+    policy_result: result.verdict === 'pass' ? 'pass' : 'blocked',
   });
   return { run_id: runId, ...result };
 }
@@ -159,13 +207,16 @@ export async function setExecutingAndRun(env: Env, runId: number) {
 
 async function executeRunTool(env: Env, args: ToolResult): Promise<ToolResult> {
   const runId = Number(args.run_id);
-  const run = await env.DB.prepare('SELECT status, policy_result FROM payroll_runs WHERE id = ?')
+  const run = await env.DB.prepare('SELECT policy_result, custom_recipient FROM payroll_runs WHERE id = ?')
     .bind(runId)
-    .first<{ status: string; policy_result: string | null }>();
+    .first<{ policy_result: string | null; custom_recipient: string | null }>();
   if (!run) throw new Error(`run ${runId} not found`);
-  const policy = run.policy_result ? JSON.parse(run.policy_result) : null;
-  if (!policy?.pass) {
-    return { run_id: runId, executed: false, error: 'policy did not pass; call request_approval instead' };
+  const policy = run.policy_result ? (JSON.parse(run.policy_result) as PolicyResult) : null;
+  if (policy?.verdict !== 'pass') {
+    return { run_id: runId, executed: false, error: `verdict is ${policy?.verdict ?? 'unknown'}; do not execute` };
+  }
+  if (run.custom_recipient) {
+    return { run_id: runId, executed: false, error: 'ad-hoc payments are not auto-executed' };
   }
   const result = await setExecutingAndRun(env, runId);
   return { run_id: runId, executed: true, ...result };
@@ -173,29 +224,40 @@ async function executeRunTool(env: Env, args: ToolResult): Promise<ToolResult> {
 
 async function requestApproval(env: Env, args: ToolResult): Promise<ToolResult> {
   const runId = Number(args.run_id);
-  const reason = String(args.reason ?? 'over policy');
+  const reason = String(args.reason ?? 'over the per-run cap');
   await env.DB.prepare(
     "UPDATE payroll_runs SET status = 'pending_approval', updated_at = datetime('now') WHERE id = ?"
   )
     .bind(runId)
     .run();
-  await audit(env.DB, {
-    actor: 'agent',
-    action: 'approval_requested',
-    run_id: runId,
-    detail: { reason },
-    policy_result: 'blocked',
-  });
+  await audit(env.DB, { actor: 'agent', action: 'approval_requested', run_id: runId, detail: { reason }, policy_result: 'blocked' });
   return { run_id: runId, status: 'pending_approval', message: `Held for a second signature: ${reason}` };
+}
+
+async function rejectRun(env: Env, runId: number, reason: string): Promise<void> {
+  await env.DB.prepare("UPDATE payroll_runs SET status = 'failed', updated_at = datetime('now') WHERE id = ?")
+    .bind(runId)
+    .run();
+  await audit(env.DB, { actor: 'agent', action: 'policy_rejected', run_id: runId, detail: { reason }, policy_result: 'blocked' });
 }
 
 async function dispatch(env: Env, name: string, args: ToolResult): Promise<ToolResult> {
   switch (name) {
     case 'draft_payroll_run': return draftPayrollRun(env, args);
+    case 'draft_payment_to': return draftPaymentTo(env, args);
     case 'check_policy': return checkPolicy(env, args);
     case 'execute_run': return executeRunTool(env, args);
     case 'request_approval': return requestApproval(env, args);
     default: return { error: `unknown tool ${name}` };
+  }
+}
+
+// Workers AI occasionally returns a transient 504; retry once before failing.
+async function aiRun(env: Env, model: string, body: unknown): Promise<any> {
+  try {
+    return await (env.AI as any).run(model, body);
+  } catch {
+    return await (env.AI as any).run(model, body);
   }
 }
 
@@ -226,7 +288,7 @@ export async function runAgent(env: Env, instruction: string): Promise<AgentOutc
   let repeated = false;
 
   for (let i = 0; i < 5 && !repeated; i++) {
-    const resp: any = await (env.AI as any).run(model, { messages, tools: TOOLS });
+    const resp: any = await aiRun(env, model, { messages, tools: TOOLS });
     const toolCalls: any[] = resp?.tool_calls ?? [];
 
     if (!toolCalls.length) {
@@ -237,9 +299,6 @@ export async function runAgent(env: Env, instruction: string): Promise<AgentOutc
     messages.push({ role: 'assistant', content: resp?.response ?? '', tool_calls: toolCalls });
     for (const call of toolCalls) {
       const name = call.name ?? call.function?.name;
-      // A capable model walks draft → check_policy → execute/approve, each step
-      // once. A weaker one re-emits a step it already did; that's our signal to
-      // stop looping and let the deterministic engine finish the run.
       if (completed.has(name)) { repeated = true; break; }
       completed.add(name);
 
@@ -257,11 +316,8 @@ export async function runAgent(env: Env, instruction: string): Promise<AgentOutc
     if (lastRunId != null && (await isTerminal(env, lastRunId))) break;
   }
 
-  // Safety net + correct-by-construction policy gate: if the model drafted a
-  // run but didn't carry it through the policy check and the execute/approve
-  // branch, finish it deterministically. The branch is a hard business rule
-  // (cap + allowlist), never a model judgment call — this is the secure design,
-  // not only a robustness fallback.
+  // Deterministic gate: finish whatever the model drafted along the correct
+  // branch. pass → execute, review → second signature, rejected → refuse.
   let run: Record<string, unknown> | undefined;
   if (lastRunId != null) {
     run = await finalizeRun(env, lastRunId);
@@ -278,11 +334,10 @@ async function isTerminal(env: Env, runId: number): Promise<boolean> {
   return !!row && ['sealed', 'failed', 'pending_approval'].includes(row.status);
 }
 
-// Drive a run to a correct terminal state no matter how far the model got.
 async function finalizeRun(env: Env, runId: number): Promise<Record<string, unknown> | undefined> {
-  let row = await env.DB.prepare('SELECT id, status, policy_result FROM payroll_runs WHERE id = ?')
+  const row = await env.DB.prepare('SELECT status, policy_result, custom_recipient FROM payroll_runs WHERE id = ?')
     .bind(runId)
-    .first<{ id: number; status: string; policy_result: string | null }>();
+    .first<{ status: string; policy_result: string | null; custom_recipient: string | null }>();
   if (!row) return undefined;
 
   if (row.status === 'draft') {
@@ -290,17 +345,23 @@ async function finalizeRun(env: Env, runId: number): Promise<Record<string, unkn
     const after = await env.DB.prepare('SELECT policy_result FROM payroll_runs WHERE id = ?')
       .bind(runId)
       .first<{ policy_result: string | null }>();
-    const policy = after?.policy_result ? JSON.parse(after.policy_result) : null;
-    if (policy?.pass) {
+    const policy: PolicyResult | null = after?.policy_result ? JSON.parse(after.policy_result) : null;
+    const reason = policy?.reasons?.[0] ?? 'policy';
+    if (policy?.verdict === 'pass' && !row.custom_recipient) {
       await setExecutingAndRun(env, runId);
+    } else if (policy?.verdict === 'pass') {
+      // ad-hoc payment to an allowed address — not on the auto-seal path.
+      await rejectRun(env, runId, 'ad-hoc payments are not auto-executed');
+    } else if (policy?.verdict === 'review') {
+      await requestApproval(env, { run_id: runId, reason });
     } else {
-      await requestApproval(env, { run_id: runId, reason: policy?.reasons?.[0] ?? 'over policy' });
+      await rejectRun(env, runId, reason);
     }
   }
 
   return (
     (await env.DB.prepare(
-      'SELECT id, period, status, total_micro, amount_multiplier, note, policy_result FROM payroll_runs WHERE id = ?'
+      'SELECT id, period, status, total_micro, amount_multiplier, note, policy_result, custom_recipient FROM payroll_runs WHERE id = ?'
     )
       .bind(runId)
       .first<Record<string, unknown>>()) ?? undefined
@@ -310,8 +371,13 @@ async function finalizeRun(env: Env, runId: number): Promise<Record<string, unkn
 function deterministicReply(run: Record<string, unknown>): string {
   const status = String(run.status);
   const total = Number(run.total_micro);
-  if (status === 'sealed') return `Sealed. Run ${run.id}, ${microToUsd(total)} across the roster.`;
-  if (status === 'pending_approval') return `Held for a second signature. Run ${run.id} is over policy at ${microToUsd(total)}.`;
-  if (status === 'failed') return `Run ${run.id} did not complete — see the audit log.`;
+  const policy: PolicyResult | null = run.policy_result ? JSON.parse(String(run.policy_result)) : null;
+
+  if (status === 'sealed') return `Sealed. Run ${run.id}, ${microToUsd(total)} paid for the day.`;
+  if (status === 'pending_approval') return `Held for a second signature — ${policy?.reasons?.[0] ?? `run ${run.id} is over the cap`}.`;
+  if (status === 'failed') {
+    if (policy && policy.verdict === 'rejected') return `Refused. ${policy.reasons[0] ?? 'blocked by policy'}.`;
+    return `Run ${run.id} did not complete — see the audit log.`;
+  }
   return `Run ${run.id} drafted at ${microToUsd(total)}.`;
 }
