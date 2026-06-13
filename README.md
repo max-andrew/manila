@@ -72,4 +72,4 @@ npm run deploy
 
 ## AI assistance
 
-Per ETHGlobal's AI usage guidelines: this project was built with Claude Code as a development assistant. It generated most of the scaffolding and boilerplate (Worker/D1 setup, schema, frontend markup) and assisted with implementation and debugging of the integration code throughout. The product concept, architecture, sponsor-integration design, policy model, brand system, and final testing and review are my own work, and all code was directed and reviewed by me.
+Built spec-driven with Claude Code per ETHGlobal's AI usage guidelines. The pre-build project brief — product, architecture, integration requirements, milestone gates — is committed at [docs/SPEC.md](docs/SPEC.md); Claude Code generated most of the code working from it, with design decisions, checkpoint review, and all sponsor-account operations by me. Full attribution, including a per-directory map of AI-generated vs. human-authored work, is in [docs/AI_USAGE.md](docs/AI_USAGE.md).
