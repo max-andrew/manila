@@ -12,7 +12,10 @@ async function sidecar<T>(env: Env, path: string, body: unknown): Promise<T> {
       'content-type': 'application/json',
       'x-sidecar-secret': env.SIGNER_SIDECAR_SECRET,
     },
-    body: JSON.stringify(body),
+    // EIP-712 typed data carries uint256 values as BigInt (amount, nonce,
+    // valid-after/before). JSON can't serialize those — stringify them; the
+    // sidecar's viem signer coerces numeric strings back for hashing.
+    body: JSON.stringify(body, (_, v) => (typeof v === 'bigint' ? v.toString() : v)),
   });
   if (!res.ok) {
     const detail = await res.text().catch(() => '');
