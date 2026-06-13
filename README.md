@@ -1,7 +1,6 @@
-<!-- logo lockup: assets/logo.svg (dropped in by hand; referenced once it lands) -->
-# Manila
-
-*The pay envelope, rebuilt onchain.*
+<p align="center">
+  <img src="assets/manila_logo_lockup.png" alt="Manila — the pay envelope, rebuilt onchain" width="460">
+</p>
 
 For a century, salaries were private because they came in a sealed manila envelope. Public chains broke that — which is why stablecoin payroll adoption sits under 1%: nobody wants their salary on a public ledger. Manila brings the envelope back. An employer funds a payroll treasury; an AI agent drafts and executes runs from plain-English commands; a policy engine (per-run cap + recipient allowlist) gates every execution, with over-threshold runs halting for human approval — two signatures on the envelope. Disbursements settle as batched, gas-free USDC micropayments on Arc via Circle Gateway, **sealed** by Unlink so amounts and counterparties stay confidential. Everything is recorded to an employer-only exportable audit trail — open the envelope.
 
@@ -57,6 +56,10 @@ Beyond the sealed default path, an employee on a vesting plan can be paid throug
 - **Flow-funded treasury** (Dynamic, Best Use of Flow) — fund the treasury with any supported token and settle to USDC, with a webhook marking the treasury funded. Gated on Flow testnet availability (currently enterprise-only).
 
 ## Privacy model
+
+<p align="center">
+  <img src="assets/manila_public_vs_sealed_comparison.png" alt="The same payroll run: public forever on a normal chain, sealed on Manila with a complete employer audit export." width="640">
+</p>
 
 Confidential to the public: payment amounts and counterparties. Each salary moves as a transfer between two `unlink1` accounts, which hides all four of sender, recipient, amount, and token on the explorer — only an opaque privacy-pool interaction is visible.
 
