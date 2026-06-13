@@ -8,7 +8,7 @@
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect x='3' y='7' width='26' height='18' rx='2' fill='%23E0BE7E' stroke='%231F2430' stroke-width='1.5'/><path d='M4 8l12 9 12-9' fill='none' stroke='%231F2430' stroke-width='1.5'/><circle cx='16' cy='17' r='2.5' fill='%231F2430'/></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;450;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root {
     --manila: #E0BE7E;   /* kraft — sealed badge + approval banner only */
@@ -18,17 +18,17 @@
     --khaki:  #6B6253;   /* secondary text */
     --line:   #E6DFD0;   /* hairlines on paper */
     --mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
-    --sans: 'Inter', -apple-system, 'Helvetica Neue', Arial, sans-serif;
+    --sans: 'IBM Plex Sans', -apple-system, 'Helvetica Neue', Arial, sans-serif;
     --shadow: 0 1px 2px rgba(31,36,48,.05), 0 4px 16px rgba(31,36,48,.05);
   }
   * { box-sizing: border-box; margin: 0; }
   html { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
-  body { background: var(--paper); color: var(--ink); font-family: var(--sans);
-         line-height: 1.5; font-size: 15px; }
+  body { background: var(--paper); color: var(--ink); font-family: var(--sans); line-height: 1.55; font-size: 15px; }
   .wrap { max-width: 1140px; margin: 0 auto; padding: 1.5rem 1.5rem 3rem; }
   a { color: inherit; }
   .num, .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
   .muted { color: var(--khaki); }
+  .eyebrow { font-family: var(--mono); font-size: .64rem; text-transform: uppercase; letter-spacing: .16em; color: var(--khaki); font-weight: 500; }
 
   /* top bar */
   .topbar { display: flex; align-items: center; justify-content: space-between;
@@ -45,105 +45,114 @@
   .gh:hover { opacity: 1; }
   .gh svg { width: 22px; height: 22px; fill: currentColor; display: block; }
 
-  /* hero: explanation + comparison side by side, so the live panels sit near the fold */
-  .hero { display: grid; grid-template-columns: 1fr 1.04fr; gap: 2.2rem; align-items: center;
-          padding: 1.5rem 0 1.6rem; }
-  .hero h1 { font-size: 1.95rem; font-weight: 700; letter-spacing: -0.02em; line-height: 1.14; }
-  .hero p { margin-top: .8rem; color: var(--khaki); font-size: 1rem; max-width: 46ch; }
+  /* hero */
+  .hero { display: grid; grid-template-columns: 1fr 1.04fr; gap: 2.2rem; align-items: center; padding: 1.5rem 0 1.6rem; }
+  .hero h1 { font-size: 2rem; font-weight: 700; letter-spacing: -0.025em; line-height: 1.12; }
+  .hero p { margin-top: .85rem; color: var(--khaki); font-size: 1rem; max-width: 46ch; }
   .hero b { color: var(--ink); font-weight: 600; }
-  .hero figure { margin: 0; background: #fff; border: 1px solid var(--line); border-radius: 10px;
-                 box-shadow: var(--shadow); padding: 1rem 1.1rem; }
+  .hero figure { margin: 0; background: #fff; border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); padding: 1rem 1.1rem; }
   .hero figure img { width: 100%; height: auto; display: block; }
   .hero figure figcaption { text-align: center; color: var(--khaki); font-size: .78rem; margin-top: .7rem; }
 
-  /* app grid */
-  main { display: grid; grid-template-columns: 0.9fr 1.25fr 1.35fr; gap: 1.1rem; align-items: start; }
-  .card { background: #fff; border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow);
-          padding: 1.15rem 1.2rem; }
-  .card > h2 { font-size: .7rem; text-transform: uppercase; letter-spacing: .15em; color: var(--khaki);
-               font-weight: 600; padding-bottom: .7rem; border-bottom: 1px solid var(--line); margin-bottom: .9rem;
+  /* layout — agent on top (primary), treasury + audit below */
+  main { display: flex; flex-direction: column; gap: 1.1rem; }
+  .row-2 { display: grid; grid-template-columns: 1fr 1.18fr; gap: 1.1rem; align-items: start; }
+  .card { background: #fff; border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); padding: 1.2rem 1.3rem; }
+  .card > h2 { font-family: var(--mono); font-size: .7rem; text-transform: uppercase; letter-spacing: .15em; color: var(--khaki);
+               font-weight: 500; padding-bottom: .7rem; border-bottom: 1px solid var(--line); margin-bottom: 1rem;
                display: flex; align-items: center; justify-content: space-between; }
+  .link-btn { font-family: var(--mono); font-size: .66rem; letter-spacing: .04em; color: var(--khaki); background: none;
+              border: none; padding: 0; cursor: pointer; text-transform: none; }
+  .link-btn:hover { color: var(--ink); text-decoration: underline; background: none; }
   .mode { font-family: var(--mono); font-size: .6rem; letter-spacing: .08em; text-transform: none; font-weight: 400;
           color: var(--khaki); border: 1px solid var(--line); border-radius: 999px; padding: .1rem .5rem; cursor: help; }
   .mode .d { color: #4f7a52; }
-  .agent-foot { font-size: .68rem; color: var(--khaki); margin-top: .7rem; line-height: 1.45; }
 
-  /* treasury */
-  #treasury-balance { font-family: var(--mono); font-size: 2.1rem; letter-spacing: -.01em; margin: .1rem 0 .15rem; }
-  #treasury-sub { font-size: .78rem; }
-  #nano-balance { margin-top: .85rem; }
-  #nano-balance .lbl { font-size: .64rem; text-transform: uppercase; letter-spacing: .1em; color: var(--khaki); }
-  #nano-balance .amt { font-family: var(--mono); font-size: 1.05rem; color: var(--ink); }
-  #nano-balance .sub { font-size: .68rem; color: var(--khaki); }
-  table { width: 100%; border-collapse: collapse; font-size: .8rem; margin-top: 1rem; }
-  th, td { text-align: left; padding: .4rem .15rem; border-bottom: 1px solid var(--line); }
-  th { color: var(--khaki); font-weight: 500; font-size: .68rem; text-transform: uppercase; letter-spacing: .08em; }
-  td.amt, td .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
-  tbody tr:last-child td { border-bottom: none; }
-
-  /* agent */
-  #chat-log { min-height: 7.5rem; max-height: 13rem; overflow-y: auto; display: flex; flex-direction: column; gap: .55rem; }
-  .msg { max-width: 92%; font-size: .82rem; line-height: 1.45; padding: .45rem .65rem; border-radius: 9px; }
+  /* agent (full width, primary) */
+  #agent { padding-bottom: 1.1rem; }
+  #chat-log { min-height: 6rem; max-height: 15rem; overflow-y: auto; display: flex; flex-direction: column; gap: .55rem; }
+  .msg { max-width: 80%; font-size: .85rem; line-height: 1.5; padding: .5rem .7rem; border-radius: 10px; }
   .msg.you { align-self: flex-end; background: var(--ink); color: #fff; border-bottom-right-radius: 2px; }
-  .msg.agent { align-self: flex-start; background: var(--paper); border: 1px solid var(--line);
-               font-family: var(--mono); border-bottom-left-radius: 2px; }
+  .msg.agent { align-self: flex-start; background: var(--paper); border: 1px solid var(--line); font-family: var(--mono); font-size: .8rem; border-bottom-left-radius: 2px; }
   .msg.agent.think { color: var(--khaki); font-style: italic; }
-  .placeholder { color: var(--khaki); font-size: .82rem; }
-  .chips { display: flex; flex-wrap: wrap; gap: .4rem; margin: .9rem 0 .6rem; }
-  .chip { font-family: var(--mono); font-size: .7rem; color: var(--khaki); background: #fff;
-          border: 1px solid var(--line); border-radius: 999px; padding: .25rem .6rem; cursor: pointer; }
+  .placeholder { color: var(--khaki); font-size: .85rem; }
+  .chips { display: flex; flex-wrap: wrap; gap: .4rem; margin: 1rem 0 .7rem; }
+  .chip { font-family: var(--mono); font-size: .7rem; color: var(--khaki); background: #fff; border: 1px solid var(--line); border-radius: 999px; padding: .28rem .65rem; cursor: pointer; }
   .chip:hover { border-color: var(--ink); color: var(--ink); }
   #chat-form { display: flex; gap: .5rem; }
-  #chat-input { flex: 1; font-family: var(--mono); font-size: .82rem; padding: .5rem .6rem;
-                border: 1px solid var(--ink); border-radius: 7px; background: #fff; color: var(--ink); }
+  #chat-input { flex: 1; font-family: var(--mono); font-size: .82rem; padding: .55rem .7rem; border: 1px solid var(--ink); border-radius: 7px; background: #fff; color: var(--ink); }
   #chat-input:focus { outline: 2px solid rgba(31,36,48,.15); outline-offset: 1px; }
-  button { font-family: var(--mono); font-size: .74rem; letter-spacing: .04em; cursor: pointer;
-           padding: .5rem .85rem; border: 1px solid var(--ink); border-radius: 7px; background: var(--ink); color: #fff; }
+  button { font-family: var(--mono); font-size: .74rem; letter-spacing: .04em; cursor: pointer; padding: .55rem .9rem; border: 1px solid var(--ink); border-radius: 7px; background: var(--ink); color: #fff; }
   button:hover { background: #2c3340; }
   button:disabled { opacity: .45; cursor: default; }
+  .agent-foot { font-size: .72rem; color: var(--khaki); margin-top: .8rem; }
 
-  /* approval banner — the manila envelope flap */
-  #approval-banner { background: var(--manila); border: 1px solid var(--ink); border-radius: 9px;
-                     padding: .8rem .9rem; margin-bottom: .9rem; font-size: .85rem; color: var(--ink); }
+  /* approval banner */
+  #approval-banner { background: var(--manila); border: 1px solid var(--ink); border-radius: 9px; padding: .85rem .95rem; margin-bottom: 1rem; font-size: .88rem; color: var(--ink); }
   #approval-banner .who { font-weight: 600; }
-  #approval-banner .banner-actions { display: flex; gap: .5rem; margin-top: .6rem; }
+  #approval-banner .banner-actions { display: flex; gap: .5rem; margin-top: .65rem; }
   #approval-banner button { background: var(--paper); color: var(--ink); }
   #approval-banner button:hover { background: #fff; }
   #approval-banner .reject-btn { background: transparent; border-color: var(--stamp); color: var(--stamp); }
   #approval-banner .reject-btn:hover { background: rgba(192,57,43,.08); }
 
   /* badges */
-  .badge { font-family: var(--mono); font-size: .64rem; letter-spacing: .16em; padding: .12rem .4rem;
-           border-radius: 3px; display: inline-block; }
-  .badge.sealed { background: var(--manila); color: #5a4a2c; transform: rotate(-2deg); border: 1px solid #b9914f; }
+  .badge { font-family: var(--mono); font-size: .64rem; letter-spacing: .16em; padding: .12rem .4rem; border-radius: 3px; display: inline-block; }
   .badge.pending { color: var(--stamp); border: 1.5px solid var(--stamp); }
-  .badge.released { color: #fff; background: var(--ink); }
 
-  /* audit */
-  .audit-scroll { max-height: 21rem; overflow-y: auto; margin: -0.2rem -0.2rem 0; }
-  #audit-table { font-size: .76rem; }
-  #audit-table thead th { position: sticky; top: 0; background: #fff; z-index: 1; }
-  .seal a { font-family: var(--mono); font-size: .72rem; color: var(--khaki); text-decoration: none; white-space: nowrap; }
-  .seal a:hover { color: var(--ink); }
-  .explorer-links { margin-top: .7rem; display: flex; flex-wrap: wrap; gap: .15rem .9rem; }
+  /* treasury */
+  #treasury-balance { font-family: var(--mono); font-size: 2.1rem; letter-spacing: -.01em; margin: .1rem 0 .35rem; }
+  #treasury-sub .l1 { font-size: .82rem; color: var(--ink); }
+  #treasury-sub .l2 { font-size: .72rem; color: var(--khaki); }
+  #nano-balance { margin-top: .9rem; }
+  #nano-balance .lbl { font-size: .62rem; font-family: var(--mono); text-transform: uppercase; letter-spacing: .1em; color: var(--khaki); }
+  #nano-balance .amt { font-family: var(--mono); font-size: 1.05rem; color: var(--ink); }
+  #nano-balance .sub { font-size: .68rem; color: var(--khaki); }
+  .explorer-links { margin-top: .8rem; display: flex; flex-wrap: wrap; gap: .15rem .9rem; }
   .explorer-links a { font-family: var(--mono); font-size: .7rem; color: var(--khaki); text-decoration: none; white-space: nowrap; }
   .explorer-links a:hover { color: var(--ink); text-decoration: underline; }
+
+  /* roster */
+  .roster-head { display: flex; align-items: center; justify-content: space-between; margin-top: 1.3rem; padding-bottom: .35rem; border-bottom: 1px solid var(--line); }
+  table { width: 100%; border-collapse: collapse; font-size: .82rem; }
+  #employees td { padding: .45rem .15rem; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  #employees tr:last-child td { border-bottom: none; }
+  .amt { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  .paid { font-family: var(--mono); font-size: .68rem; color: #4f7a52; text-decoration: none; white-space: nowrap; }
+  .paid:hover { text-decoration: underline; }
+  .unpaid { font-family: var(--mono); font-size: .68rem; color: var(--khaki); }
+  .rate-input { width: 4.5rem; font-family: var(--mono); font-size: .78rem; padding: .2rem .35rem; border: 1px solid var(--line); border-radius: 5px; text-align: right; }
+  .rm-btn { background: none; border: none; color: var(--stamp); font-size: 1rem; padding: 0 .3rem; cursor: pointer; line-height: 1; }
+  .rm-btn:hover { background: none; }
+  #add-employee { display: flex; gap: .4rem; margin-top: .7rem; }
+  #add-employee input { font-family: var(--mono); font-size: .75rem; padding: .35rem .45rem; border: 1px solid var(--line); border-radius: 5px; min-width: 0; }
+  #add-employee .ae-name { flex: 1.4; }
+  #add-employee .ae-rate { flex: .7; }
+  #add-employee button { padding: .35rem .7rem; font-size: .7rem; }
+
+  /* audit */
+  .audit-scroll { max-height: 23rem; overflow-y: auto; margin: 0 -.2rem; }
+  #audit-table { font-size: .76rem; }
+  #audit-table th, #audit-table td { text-align: left; padding: .4rem .35rem; border-bottom: 1px solid var(--line); }
+  #audit-table th { color: var(--khaki); font-weight: 500; font-size: .62rem; text-transform: uppercase; letter-spacing: .08em; font-family: var(--mono); }
+  #audit-table thead th { position: sticky; top: 0; background: #fff; z-index: 1; }
+  #audit-table tbody tr:last-child td { border-bottom: none; }
+  .seal a { font-family: var(--mono); font-size: .72rem; color: var(--khaki); text-decoration: none; white-space: nowrap; }
+  .seal a:hover { color: var(--ink); }
   .envelope-btn { display: inline-flex; flex-direction: column; gap: .12rem; margin-top: 1.1rem; text-decoration: none; }
   .envelope-btn .env-main { font-weight: 600; font-size: .84rem; color: var(--ink); }
   .envelope-btn .env-sub { font-family: var(--mono); font-size: .68rem; color: var(--khaki); }
   .envelope-btn:hover .env-main { text-decoration: underline; }
 
   /* footer */
-  footer { margin-top: 2.5rem; padding-top: 1.1rem; border-top: 1px solid var(--line);
-           display: flex; flex-wrap: wrap; gap: .5rem 1.25rem; align-items: center;
-           font-family: var(--mono); font-size: .72rem; color: var(--khaki); }
+  footer { margin-top: 2.5rem; padding-top: 1.1rem; border-top: 1px solid var(--line); display: flex; flex-wrap: wrap; gap: .5rem 1.25rem; align-items: center; font-family: var(--mono); font-size: .72rem; color: var(--khaki); }
   footer .stack { margin-left: auto; }
 
   @media (max-width: 920px) {
-    main { grid-template-columns: 1fr; }
     .hero { grid-template-columns: 1fr; gap: 1.1rem; padding-top: 1rem; }
     .hero h1 { font-size: 1.6rem; }
     .hero figure { max-width: 560px; }
+    .row-2 { grid-template-columns: 1fr; }
   }
 </style>
 </head>
@@ -154,8 +163,7 @@
     <img class="logo" src="/assets/manila_logo_mark.png" alt="Manila — the pay envelope, rebuilt onchain">
     <nav>
       <span class="chain"><span class="dot" id="status-dot"></span><span id="status">connecting…</span></span>
-      <a class="gh" href="https://github.com/max-andrew/manila" target="_blank" rel="noopener"
-         aria-label="View source on GitHub" title="View source on GitHub">
+      <a class="gh" href="https://github.com/max-andrew/manila" target="_blank" rel="noopener" aria-label="View source on GitHub" title="View source on GitHub">
         <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path></svg>
       </a>
     </nav>
@@ -173,18 +181,6 @@
   </section>
 
   <main>
-    <section class="card" id="treasury">
-      <h2>Treasury</h2>
-      <div id="treasury-balance" class="muted">—</div>
-      <div id="treasury-sub" class="muted">sealed payroll balance · private USDC</div>
-      <div id="nano-balance"></div>
-      <div id="treasury-links" class="explorer-links"></div>
-      <table id="employees">
-        <thead><tr><th>Employee</th><th style="text-align:right">Per day</th></tr></thead>
-        <tbody></tbody>
-      </table>
-    </section>
-
     <section class="card" id="agent">
       <h2>Agent <span class="mode" title="Run on demand, or automate with a Cloudflare Cron Trigger for hands-off daily payroll."><span class="d">●</span> Manual mode</span></h2>
       <div id="approval-banner" hidden></div>
@@ -202,19 +198,40 @@
       <p class="agent-foot">Manual today — a <b>Cloudflare Cron Trigger</b> can run it daily, hands-off.</p>
     </section>
 
-    <section class="card" id="audit">
-      <h2>Audit</h2>
-      <div class="audit-scroll">
-        <table id="audit-table">
-          <thead><tr><th>When</th><th>Actor</th><th>Action</th><th>Policy</th><th>Seal</th></tr></thead>
-          <tbody></tbody>
-        </table>
-      </div>
-      <a id="csv-link" class="envelope-btn" href="/api/audit.csv" title="Download the complete audit trail as CSV">
-        <span class="env-main">Get the envelope archive ↓</span>
-        <span class="env-sub">Download the full audit trail (CSV)</span>
-      </a>
-    </section>
+    <div class="row-2">
+      <section class="card" id="treasury">
+        <h2>Treasury</h2>
+        <div id="treasury-balance" class="muted">—</div>
+        <div id="treasury-sub"><div class="l1">sealed payroll balance</div><div class="l2">private USDC on Arc</div></div>
+        <div id="nano-balance"></div>
+        <div id="treasury-links" class="explorer-links"></div>
+
+        <div class="roster-head">
+          <span class="eyebrow">Team · daily rate</span>
+          <button class="link-btn" id="manage-toggle">Manage</button>
+        </div>
+        <table id="employees"><tbody></tbody></table>
+        <div id="add-employee" hidden>
+          <input class="ae-name" id="ae-name" placeholder="Name" />
+          <input class="ae-rate" id="ae-rate" type="number" step="0.01" placeholder="$/day" />
+          <button id="ae-add">Add</button>
+        </div>
+      </section>
+
+      <section class="card" id="audit">
+        <h2>Audit</h2>
+        <div class="audit-scroll">
+          <table id="audit-table">
+            <thead><tr><th>When</th><th>Actor</th><th>Action</th><th>Policy</th><th>Seal</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <a id="csv-link" class="envelope-btn" href="/api/audit.csv" title="Download the complete audit trail as CSV">
+          <span class="env-main">Get the envelope archive ↓</span>
+          <span class="env-sub">Download the full audit trail (CSV)</span>
+        </a>
+      </section>
+    </div>
   </main>
 
   <footer>
@@ -231,21 +248,38 @@ const esc = (s) => String(s ?? '').replace(/[&<>]/g, c => ({ '&': '&amp;', '<': 
 const el = (id) => document.getElementById(id);
 const ARCSCAN = 'https://testnet.arcscan.app';
 const EXPLORER = ARCSCAN + '/tx/';
-const VAULT_ADDRESS = '0x2f217B2A62826F247084B207106233E5F67c60Ac'; // deployed PayrollVault
+const VAULT_ADDRESS = '0x2f217B2A62826F247084B207106233E5F67c60Ac';
 const short = (h) => h ? h.slice(0, 6) + '…' + h.slice(-4) : '';
+let manageMode = false;
 
-function setStatus(text, kind) {
-  el('status').textContent = text;
-  el('status-dot').className = 'dot' + (kind ? ' ' + kind : '');
-}
+function setStatus(text, kind) { el('status').textContent = text; el('status-dot').className = 'dot' + (kind ? ' ' + kind : ''); }
 
-// A sealed disbursement's tx_refs hold the on-chain hash; link it (amounts
-// stay hidden on the explorer — that's the point).
 function sealCell(refsJson) {
   let refs = [];
   try { refs = JSON.parse(refsJson || '[]'); } catch {}
   const hash = (refs.find(r => /^0x[0-9a-f]{64}$/i.test(r)) || '');
   return hash ? `<a href="${EXPLORER}${hash}" target="_blank" rel="noopener" title="View sealed disbursement on Arc: ${hash}">${short(hash)}&nbsp;↗</a>` : '';
+}
+
+function renderRoster(employees) {
+  el('add-employee').hidden = !manageMode;
+  el('manage-toggle').textContent = manageMode ? 'Done' : 'Manage';
+  document.querySelector('#employees tbody').innerHTML = employees.map(e => {
+    if (manageMode) {
+      return `<tr><td>${esc(e.name)}</td>
+        <td style="text-align:right"><input class="rate-input" type="number" step="0.01" value="${(e.salary_micro/1e6).toFixed(2)}" data-id="${e.id}"></td>
+        <td style="text-align:right;width:1.5rem"><button class="rm-btn" data-id="${e.id}" title="Remove">×</button></td></tr>`;
+    }
+    const paid = e.last_seal_ref
+      ? `<a class="paid" href="${EXPLORER}${e.last_seal_ref}" target="_blank" rel="noopener" title="Sealed ${esc(e.last_paid_at || '')}">paid&nbsp;✓</a>`
+      : `<span class="unpaid">—</span>`;
+    return `<tr><td>${esc(e.name)}</td><td style="text-align:center">${paid}</td><td class="amt" style="text-align:right">${usd(e.salary_micro)}</td></tr>`;
+  }).join('') || '<tr><td class="muted">No team members.</td></tr>';
+
+  if (manageMode) {
+    document.querySelectorAll('.rm-btn').forEach(b => b.onclick = () => removeEmployee(b.dataset.id));
+    document.querySelectorAll('.rate-input').forEach(i => i.onchange = () => updateRate(i.dataset.id, i.value));
+  }
 }
 
 async function load() {
@@ -261,7 +295,6 @@ async function load() {
     if (treasury?.sealed?.available) {
       el('treasury-balance').textContent = '$' + treasury.sealed.formatted;
       el('treasury-balance').classList.remove('muted');
-      el('treasury-sub').textContent = 'sealed payroll balance · private USDC';
     }
     el('nano-balance').innerHTML = treasury?.fees?.available
       ? `<div class="lbl">Nanopayment balance</div><div><span class="amt">$${treasury.fees.formatted}</span> <span class="sub">· gas-free seal fees</span></div>`
@@ -272,18 +305,15 @@ async function load() {
       `<a href="${ARCSCAN}/address/${VAULT_ADDRESS}" target="_blank" rel="noopener" title="${VAULT_ADDRESS}">Vesting vault&nbsp;↗</a>`,
     ].filter(Boolean).join('');
 
-    document.querySelector('#employees tbody').innerHTML = employees
-      .map(e => `<tr><td>${esc(e.name)}</td><td class="amt" style="text-align:right">${usd(e.salary_micro)}</td></tr>`)
-      .join('');
+    renderRoster(employees);
 
-    // Each disbursement row links to that employee's sealed transfer on Arc.
     const empName = {};
     employees.forEach(e => { empName[e.id] = e.name; });
     const action = (a) => {
       if (a.action === 'disburse') {
         try { const d = JSON.parse(a.detail || '{}'); if (empName[d.employee]) return `seal · ${esc(empName[d.employee])}`; } catch {}
       }
-      return esc(a.action);
+      return esc(a.action).replace(/_/g, ' ');
     };
     document.querySelector('#audit-table tbody').innerHTML = audit.length
       ? audit.map(a => `<tr><td class="muted">${esc((a.created_at||'').slice(5,16))}</td><td>${esc(a.actor)}</td>
@@ -338,6 +368,18 @@ async function refreshApproval() {
   }
 }
 
+async function approve(e) {
+  const btn = e.target;
+  btn.disabled = true; btn.textContent = 'Releasing…';
+  try {
+    const res = await fetch('/api/approve/' + btn.dataset.run, { method: 'POST' });
+    const data = await res.json();
+    const sealed = (data.payments || []).filter(p => p.status === 'sealed').length;
+    addMsg('Agent', res.ok && sealed ? `Released. ${sealed} payments sealed.` : `Approved. ${data.message || (data.payments ? 'settlement pending — see audit log.' : data.error || '')}`);
+  } catch (err) { addMsg('Agent', 'Approval error: ' + err.message); }
+  await load();
+}
+
 async function reject(e) {
   const btn = e.target;
   btn.disabled = true; btn.textContent = '…';
@@ -345,26 +387,7 @@ async function reject(e) {
     const res = await fetch('/api/reject/' + btn.dataset.run, { method: 'POST' });
     const data = await res.json();
     addMsg('Agent', res.ok ? `Run ${btn.dataset.run} declined — nothing was paid.` : (data.error || 'Could not decline.'));
-  } catch (err) {
-    addMsg('Agent', 'Reject error: ' + err.message);
-  }
-  await load();
-}
-
-async function approve(e) {
-  const btn = e.target;
-  btn.disabled = true;
-  btn.textContent = 'Releasing…';
-  try {
-    const res = await fetch('/api/approve/' + btn.dataset.run, { method: 'POST' });
-    const data = await res.json();
-    const sealed = (data.payments || []).filter(p => p.status === 'sealed').length;
-    addMsg('Agent', res.ok && sealed
-      ? `Released. ${sealed} payments sealed.`
-      : `Approved. ${data.message || (data.payments ? 'settlement pending — see audit log.' : data.error || '')}`);
-  } catch (err) {
-    addMsg('Agent', 'Approval error: ' + err.message);
-  }
+  } catch (err) { addMsg('Agent', 'Reject error: ' + err.message); }
   await load();
 }
 
@@ -376,29 +399,45 @@ async function sendMessage(message) {
   send.disabled = true; send.textContent = '…';
   const thinking = addMsg('Agent', 'drafting…', 'think');
   try {
-    const res = await fetch('/api/agent', {
-      method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ message }),
-    });
+    const res = await fetch('/api/agent', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ message }) });
     const data = await res.json();
     thinking.remove();
     addMsg('Agent', data.reply || data.error || 'No response.');
-  } catch (err) {
-    thinking.remove();
-    addMsg('Agent', 'Error: ' + err.message);
-  }
+  } catch (err) { thinking.remove(); addMsg('Agent', 'Error: ' + err.message); }
   send.disabled = false; send.textContent = 'Send';
   await load();
 }
 
-el('chat-form').addEventListener('submit', (e) => {
-  e.preventDefault();
-  sendMessage(el('chat-input').value.trim());
-});
-el('chips').addEventListener('click', (e) => {
-  const chip = e.target.closest('.chip');
-  if (chip) sendMessage(chip.dataset.msg);
-});
+// employee management
+async function removeEmployee(id) {
+  await fetch('/api/employees/' + id, { method: 'DELETE' });
+  await load();
+}
+async function updateRate(id, value) {
+  const daily = Number(value);
+  if (!(daily > 0)) return;
+  await fetch('/api/employees/' + id, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ daily_usd: daily }) });
+  await load();
+}
+async function addEmployee() {
+  const name = el('ae-name').value.trim();
+  const daily = Number(el('ae-rate').value);
+  if (!name || !(daily > 0)) return;
+  const btn = el('ae-add'); btn.disabled = true; btn.textContent = '…';
+  try {
+    const res = await fetch('/api/employees', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name, daily_usd: daily }) });
+    const data = await res.json();
+    el('ae-name').value = ''; el('ae-rate').value = '';
+    if (!data.payable) addMsg('Agent', `${name} added — note: private account not provisioned, so they can't receive sealed pay yet.`);
+  } catch (err) { addMsg('Agent', 'Add failed: ' + err.message); }
+  btn.disabled = false; btn.textContent = 'Add';
+  await load();
+}
+
+el('chat-form').addEventListener('submit', (e) => { e.preventDefault(); sendMessage(el('chat-input').value.trim()); });
+el('chips').addEventListener('click', (e) => { const chip = e.target.closest('.chip'); if (chip) sendMessage(chip.dataset.msg); });
+el('manage-toggle').addEventListener('click', () => { manageMode = !manageMode; load(); });
+el('ae-add').addEventListener('click', addEmployee);
 
 load();
 </script>
