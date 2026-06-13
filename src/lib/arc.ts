@@ -25,6 +25,7 @@ export const explorerAddressUrl = (addr: string) => `${ARC_EXPLORER}/address/${a
 // $4.20 for whole-cent amounts, $0.001 for sub-cent nanopayment fees.
 export const microToUsd = (micro: number | bigint) => {
   const n = Number(micro);
-  const decimals = n % 10_000 === 0 ? 2 : 6;
-  return `$${(n / 1e6).toFixed(decimals)}`;
+  const dollars = n / 1e6;
+  if (n % 10_000 === 0) return `$${dollars.toFixed(2)}`;
+  return `$${dollars.toFixed(6).replace(/0+$/, '').replace(/\.$/, '')}`;
 };
