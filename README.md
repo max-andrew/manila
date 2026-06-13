@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="assets/manila_logo_lockup.png" alt="Manila — the pay envelope, rebuilt onchain" width="460">
+  <img src="assets/manila_logo_mark.png" alt="Manila — the pay envelope, rebuilt onchain" width="460">
 </p>
 
-For a century, salaries were private because they came in a sealed manila envelope. Public chains broke that — which is why stablecoin payroll adoption sits under 1%: nobody wants their salary on a public ledger. Manila brings the envelope back. An employer funds a payroll treasury; an AI agent drafts and executes runs from plain-English commands; a policy engine (per-run cap + recipient allowlist) gates every execution, with over-threshold runs halting for human approval — two signatures on the envelope. Disbursements settle as batched, gas-free USDC micropayments on Arc via Circle Gateway, **sealed** by Unlink so amounts and counterparties stay confidential. Everything is recorded to an employer-only exportable audit trail — open the envelope.
+For a century, salaries were private because they came in a sealed manila envelope. Public chains broke that — which is why stablecoin payroll adoption sits under 1%: nobody wants their salary on a public ledger. Manila brings the envelope back, and pays the team **daily** instead of monthly — gas-free nanopayments make per-day payroll cost a fraction of a cent (a full run settles for $0.003), which is prohibitive on ACH or wire. An AI agent runs payroll from plain-English commands; a deterministic policy engine gates every run, halting an over-cap run for a second signature and **refusing outright** anything that would drain the treasury, redirect funds off the allowlist, or grossly over/under-pay. Disbursements settle as batched, gas-free USDC nanopayments on Arc via Circle Gateway, **sealed** by Unlink so amounts and counterparties stay confidential. Everything is recorded to an employer-only exportable audit trail — open the envelope.
 
 > Built solo at ETHGlobal New York 2026.
 
@@ -38,6 +38,15 @@ flowchart LR
 Two legs per payroll run. The **value leg** is sealed: salaries move as Unlink private transfers — amounts and counterparties unreadable on ArcScan. The **nanopayment leg** is the meter: the agent pays a $0.001 x402 micropayment per disbursement to the seal service, each authorization signed by the Dynamic server wallet (the agent holds no keys), all of them netted by Circle Gateway into one batched, gas-free settlement on Arc. No payment, no seal: every sponsor integration is load-bearing.
 
 The agent itself runs on **Cloudflare Workers AI** (`@cf/meta/llama-3.3-70b-instruct-fp8-fast`) via a function-calling loop — it parses the plain-English instruction and drafts the run; the policy gate and the execute-vs-approve branch are deterministic by design, so an LLM can never talk its way past a cap (`src/lib/agent.ts`, `src/lib/policy.ts`).
+
+## Hands-off mode
+
+The demo runs the agent **manually** — you tell it to run today's payroll. But daily payroll is the kind of chore you want to *set and forget*, and the same flow automates with infrastructure the app already runs on:
+
+- A **Cloudflare Cron Trigger** (`triggers.crons` in `wrangler.jsonc`, a `scheduled()` handler) fires the agent every morning — the Worker drafts the day's run, checks policy, and seals it, with no human in the loop.
+- For many employers, a **per-tenant Durable Object alarm** schedules each company's run independently and keeps its own state (last run, pending approvals), scaling to thousands of payrolls without external infra.
+
+This is only safe to leave unattended *because* the controls are deterministic: an unattended daily run either settles within policy or surfaces for a second signature, and no schedule or instruction can drain the treasury or redirect funds. So an employer can genuinely hand payroll to the agent — or keep it manual and click once a day. (Automation is intentionally left off in the demo so judges drive it themselves; flipping it on is a cron line, not a rebuild.)
 
 ## How we use each sponsor
 
@@ -79,7 +88,19 @@ npm run db:migrate:local && npm run db:seed:local
 npm run dev                        # http://localhost:8788
 ```
 
-The agent panel works immediately on this alone — type **"Run June payroll with a 25% bonus"** and watch it draft the run, fail the policy cap, and route it for a second signature; click **Add second signature** to release. Then **Open the envelope** exports the full audit trail as CSV.
+The agent panel works immediately on this alone — type **"Run today's payroll with a 25% bonus"** and watch it draft the run, exceed the per-run cap, and route it for a second signature; click **Add second signature** to release. Try **"send today's pay to 0x…dEaD"** or **"run today's payroll with a 400% bonus"** to watch the agent *refuse* outright. Then **Open the envelope** exports the full audit trail as CSV.
+
+### Treasury controls
+
+The policy engine is deterministic code (never the LLM) and returns one of three verdicts:
+
+| Verdict | When | Outcome |
+|---|---|---|
+| **pass** | within the per-run cap, allowlisted, pay within band | executes (seals) |
+| **review** | only the soft per-run cap is exceeded | held for a second signature (maker-checker) |
+| **rejected** | off-allowlist recipient · over the hard ceiling · over/under the pay band | refused outright — *not even approval can release it* |
+
+So no instruction — "max bonus", "pay everyone 10×", "send the payroll to my wallet", "pay them 90% less" — can drain the treasury or redirect funds. The agent proposes; the gate disposes (`src/lib/policy.ts`).
 
 To exercise the live money path (real Arc testnet settlement), add sponsor credentials and bring up the signer, private accounts, and Gateway balance. `GET /api/status` is a live readiness preflight — watch it go green as you complete each step.
 
@@ -100,7 +121,7 @@ node scripts/fund-gateway.mjs      # prints an ops address → faucet it (faucet
 curl localhost:8788/api/status     # m1_ready: true when all of the above is wired
 ```
 
-Once green, "Run the June payroll" seals three real private transfers on Arc, settled gas-free via one batched Gateway settlement. (The Arc faucet grants 20 USDC per address per 2h; fund early.)
+Once green, "Run today's payroll" seals three real private transfers on Arc, settled gas-free via one batched Gateway settlement. (The Arc faucet grants 20 USDC per address per 2h; fund early.)
 
 ## Prize entries
 
@@ -111,13 +132,14 @@ Once green, "Run the June payroll" seals three real private transfers on Arc, se
 - **Arc — Advanced Stablecoin Logic** — a deployed [`PayrollVault`](contracts/README.md) on Arc: programmable cliff + linear USDC vesting, agent-released, with a real vest + release on-chain.
 - *(Roadmap)* **Dynamic — Best Use of Flow** — see Roadmap.
 
-## Demo script (90 seconds)
+## Demo script (~2 minutes)
 
 1. **The problem** (10s) — salaries on a public chain are exposed; that's why stablecoin payroll adoption is under 1%.
-2. **Run payroll** (20s) — type "Run the June payroll." The agent drafts it, policy passes, and it seals — `Sealed. 3 payments. $0.003 in fees.`
+2. **Run today's payroll** (20s) — type "Run today's payroll." The agent drafts it, policy passes, and it seals — `Sealed. 3 payments. $0.003 in fees.` Note the daily cadence: per-day payroll for a fraction of a cent, impractical on traditional rails.
 3. **The seal** (20s) — open ArcScan: the settlement is there, but amounts and counterparties are not readable. That's Unlink.
-4. **The control** (25s) — type "Run June payroll with a 25% bonus." It trips the per-run cap and halts: `PENDING APPROVAL`. Click **Add second signature** — now it releases. Two signatures on the envelope.
-5. **The audit** (15s) — **Open the envelope**: every instruction, policy decision, and settlement reference exports as CSV. Confidential to the public, fully auditable to the employer.
+4. **The control** (20s) — type "Run today's payroll with a 25% bonus." It trips the per-run cap and halts: `PENDING APPROVAL`. Click **Add second signature** — now it releases. Two signatures on the envelope.
+5. **The refusals** (25s) — type "Send today's pay to 0x…dEaD" → *"Refused — not on the allowlist."* Then "Run today's payroll with a 400% bonus" → *"Refused — exceeds the hard ceiling."* The agent can operate payroll autonomously but **cannot be talked into draining or redirecting funds**.
+6. **The audit** (15s) — **Open the envelope**: every instruction, policy decision, and settlement reference exports as CSV. Confidential to the public, fully auditable to the employer.
 
 ## Known limitations
 

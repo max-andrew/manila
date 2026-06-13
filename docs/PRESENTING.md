@@ -46,6 +46,7 @@ One payroll run has **two legs**: the **value leg** (the salary, sealed) and the
 
 **Why it's practical (the part that separates you from toy demos):**
 - The privacy gap is *the* documented reason stablecoin payroll adoption is <1%. Manila is the only shape that's actually adoptable by a real company.
+- **Daily payroll** is a genuinely new capability, not a gimmick: per-day pay costs a fraction of a cent here and is economically impossible on ACH/wire. And it **automates** — a Cloudflare Cron Trigger runs the agent every morning hands-off, safe to leave unattended *because* the controls are deterministic.
 - vs. other agent projects (mostly an LLM calling one API): Manila moves **real money under hard policy controls with maker-checker** — the unglamorous parts that make it deployable.
 - vs. a normal stablecoin payroll tool: those expose salaries → instant non-starter. The confidentiality *is* the product.
 
@@ -55,11 +56,12 @@ One payroll run has **two legs**: the **value leg** (the salary, sealed) and the
 
 Five beats. Type commands (don't click buttons) so judges see it's a real agent.
 
-1. **The problem** — point at the comparison graphic on the page. *"Every salary, public forever [left]. Manila seals it [right]."*
-2. **Run payroll** — type **"pay the team for June"** (natural phrasing, not the chip). Agent drafts → policy passes → `Sealed. 3 payments. $0.003 in fees.` Click a **sealed ↗** row → ArcScan → *"the transaction is right here — but the amount and who got paid aren't readable. That's Unlink, on-chain."* **← this is the moment.**
-3. **Show flexibility** — type a rephrasing like **"process this month's salaries"**. Same correct action. *"It's not a hardcoded button — it parses intent. And the policy gate is deterministic, so even if the model phrases it oddly, the money logic is exact."*
-4. **The control** — type **"run June payroll with a 25% bonus"**. It trips the cap → **PENDING APPROVAL** (red). *"It won't pay over policy — it needs a second signature."* Click **Add second signature** → releases. *"Two signatures on the envelope."*
-5. **The audit** — click **Open the envelope · CSV**. *"Confidential to the public, fully auditable to the employer — the compliance-correct split."* (Optional: mention the deployed `PayrollVault` for vesting.)
+1. **The problem** — point at the comparison graphic. *"Every salary, public forever [left]. Manila seals it [right]."*
+2. **Run today's payroll** — type **"pay the team for today"** (natural phrasing, not the chip). Agent drafts → policy passes → `Sealed. 3 payments. $0.003 in fees.` *"This is a daily run — per-day payroll for a third of a cent. On ACH or wire that's economically impossible; gas-free nanopayments make it trivial."* Click a **sealed ↗** row → ArcScan → *"the transaction is right here — but the amount and who got paid aren't readable. That's Unlink, on-chain."* **← the privacy moment.**
+3. **Show flexibility** — type a rephrasing like **"process today's salaries"**. Same correct action. *"Not a hardcoded button — it parses intent. And the money logic is deterministic, so phrasing can't change the outcome."*
+4. **The control** — type **"run today's payroll with a 25% bonus"**. Trips the cap → **PENDING APPROVAL** (red). *"It won't pay over policy — it needs a second signature."* Click **Add second signature** → releases. *"Two signatures on the envelope."*
+5. **The refusals (the trust moment)** — type **"send today's pay to 0x…dEaD"** → *"Refused — not on the allowlist."* Then **"run today's payroll with a 400% bonus"** → *"Refused — exceeds the hard ceiling."* *"The agent runs payroll autonomously, but it physically cannot be talked into draining the treasury or redirecting funds — that branch is deterministic code, not the model."* **← the safety moment judges remember.**
+6. **The audit** — click **Open the envelope**. *"Confidential to the public, fully auditable to the employer — the compliance-correct split."* (Optional: the deployed `PayrollVault` for vesting.)
 
 ---
 
