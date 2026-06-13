@@ -80,12 +80,16 @@ sealApp.post('/seal/:employeeId', async (c) => {
   if (!employee) return c.json({ error: 'unknown employee' }, 404);
   if (!employee.unlink_address) return c.json({ error: 'employee has no unlink address' }, 409);
 
-  const run = await env.DB.prepare('SELECT id, status FROM payroll_runs WHERE id = ?')
+  const run = await env.DB.prepare(
+    'SELECT id, status, amount_multiplier FROM payroll_runs WHERE id = ?'
+  )
     .bind(runId)
-    .first<{ id: number; status: string }>();
+    .first<{ id: number; status: string; amount_multiplier: number }>();
   if (!run || run.status !== 'executing') {
     return c.json({ error: 'run not found or not executing' }, 409);
   }
+  // Amount for this run = salary × the run's adjustment (e.g. a bonus).
+  const amountMicro = Math.round(employee.salary_micro * Number(run.amount_multiplier ?? 1));
   const dupe = await env.DB.prepare(
     "SELECT id FROM payments WHERE run_id = ? AND employee_id = ? AND status = 'sealed'"
   )
@@ -139,14 +143,14 @@ sealApp.post('/seal/:employeeId', async (c) => {
   // Value leg: sealed salary transfer via Unlink.
   let unlinkRef: string;
   try {
-    const sealed = await sealTransfer(env, employee.unlink_address, employee.salary_micro);
+    const sealed = await sealTransfer(env, employee.unlink_address, amountMicro);
     unlinkRef = sealed.ref;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     await env.DB.prepare(
       "INSERT INTO payments (run_id, employee_id, amount_micro, status, gateway_ref) VALUES (?, ?, ?, 'failed', ?)"
     )
-      .bind(runId, employeeId, employee.salary_micro, settleResult.transaction ?? null)
+      .bind(runId, employeeId, amountMicro, settleResult.transaction ?? null)
       .run();
     await audit(env.DB, {
       actor: 'system',
@@ -160,13 +164,13 @@ sealApp.post('/seal/:employeeId', async (c) => {
   await env.DB.prepare(
     "INSERT INTO payments (run_id, employee_id, amount_micro, status, unlink_ref, gateway_ref) VALUES (?, ?, ?, 'sealed', ?, ?)"
   )
-    .bind(runId, employeeId, employee.salary_micro, unlinkRef, settleResult.transaction ?? null)
+    .bind(runId, employeeId, amountMicro, unlinkRef, settleResult.transaction ?? null)
     .run();
   await audit(env.DB, {
     actor: 'system',
     action: 'disburse',
     run_id: runId,
-    detail: { employee: employee.id, amount_micro: employee.salary_micro, fee_micro: SEAL_FEE_MICRO },
+    detail: { employee: employee.id, amount_micro: amountMicro, fee_micro: SEAL_FEE_MICRO },
     tx_refs: [unlinkRef, settleResult.transaction ?? ''].filter(Boolean),
   });
 
@@ -184,7 +188,7 @@ sealApp.post('/seal/:employeeId', async (c) => {
   return c.json({
     sealed: true,
     employee_id: employee.id,
-    amount_micro: employee.salary_micro,
+    amount_micro: amountMicro,
     unlink_ref: unlinkRef,
     gateway_ref: settleResult.transaction ?? null,
   });

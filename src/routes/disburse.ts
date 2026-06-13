@@ -81,7 +81,7 @@ export async function executeRun(env: Env, runId: number): Promise<{
       payments.push({
         employee_id: employee.id,
         name: employee.name,
-        amount_micro: employee.salary_micro,
+        amount_micro: (body.amount_micro as number) ?? employee.salary_micro,
         status: 'sealed',
         unlink_ref: body.unlink_ref as string | undefined,
         gateway_ref: (body.gateway_ref as string | null) ?? undefined,
