@@ -9,7 +9,7 @@ See [AI_USAGE.md](./AI_USAGE.md) for how the AI was used against this spec.*
 
 ---
 
-**Manila** — "The pay envelope, rebuilt onchain." Confidential, AI-agent-operated payroll in native USDC on Arc (Circle's L1 testnet). Solo hacker, ~36 hours remaining, submission Sunday morning. Keep `main` demoable at all times and advance through milestones IN ORDER. Never start a milestone until the previous one's gate is met. If an integration fights us past its timebox, flag it and propose the cut — do not silently burn hours.
+**Manila** — "The pay envelope, rebuilt onchain." Confidential, AI-agent-operated payroll in native USDC on Arc (Circle's L1 testnet). Solo hacker, ~36 hours remaining, submission Sunday morning. Keep `main` demoable at all times and advance through milestones IN ORDER. Never start a milestone until the previous one's gate is met.
 
 ## THE PRODUCT (one paragraph)
 
@@ -67,20 +67,20 @@ One page in the brand system: treasury balance, chat with run history, audit tab
 ### M4 — Flow funding (TIMEBOX 4h, cut at Sat 6 PM if blocked)
 Pre-check: does Flow have testnet/sandbox? If mainnet-only and unworkable → CUT. Otherwise: deposit screen, Flow settles USDC to treasury, webhook `POST /api/webhooks/flow` marks treasury funded + audit entry.
 
-### M5 — Vesting contract (STRETCH, TIMEBOX 3h, Sat night only, first thing cut)
+### M5 — Vesting contract (STRETCH, TIMEBOX 3h, Sat night only)
 ~120-line Solidity `PayrollVault` — scheduled releases (cliff + linear or epoch), funded in USDC, `release()` callable by agent wallet, events for audit. Deploy to Arc (foundry), verify, wire one employee through it. Gas paid in USDC.
 
 ### M6 — Submission package (Sun early AM)
 README final. Architecture diagram exported as image. 2–3 min video. Submission text: name EVERY bounty explicitly. Half-page honest DX feedback per sponsor.
 
-## DOCS (write as you go — judges score this)
+## DOCS (write as we go)
 
-README sections, maintained from M0: (1) logo + tagline + one-paragraph pitch; (2) architecture (Mermaid); (3) "How we use each sponsor" — graded by a judge in 60 seconds: what it does here, why the product breaks without it, file/line pointers; (4) privacy model: exactly what is confidential, what is auditable, why that split is compliance-correct; (5) run it from README alone; (6) 90-second demo script; (7) known limitations (honesty scores well).
+README sections, maintained from M0: (1) logo + tagline + one-paragraph pitch; (2) architecture (Mermaid); (3) "How we use each sponsor" — graded by a judge in 60 seconds: what it does here, why the product breaks without it, file/line pointers; (4) privacy model: exactly what is confidential, what is auditable, why that split is compliance-correct; (5) run it from README alone; (6) 90-second demo script; (7) known limitations (honest).
 
 ## ENGINEERING RULES
 
 - Demoable `main` after every milestone; feature work in jj changes, squash to clean commits.
 - Errors fail loudly in dev and gracefully in the demo (catch + audit-log + UI toast; never a blank screen in front of a judge).
 - No mocking chain calls. If a sponsor API is down, surface it; don't fake it.
-- Each integration must read as load-bearing, not bolted on: Flow is THE funding path, the vault is THE disbursement path for at least one employee, Unlink wraps EVERY disbursement.
+- Each integration must be load-bearing, not bolted on: Flow is THE funding path, the vault is THE disbursement path for at least one employee, Unlink wraps EVERY disbursement.
 - Ask before adding any dependency beyond: hono, viem, @anthropic-ai/sdk, @unlink-xyz/sdk, Dynamic's SDK, foundry (M5 only).

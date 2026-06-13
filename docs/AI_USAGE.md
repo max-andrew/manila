@@ -9,8 +9,8 @@ below.
 
 ## Tools
 
-- **Claude Code** (Anthropic, Claude Fable 5) — primary development assistant
-  for the whole build.
+- **Claude Code** (Anthropic, various Claude models) — primary development assistant
+  for the build.
 
 ## How it was used
 
@@ -35,7 +35,9 @@ Within that spec, Claude Code:
   salaries;
 - drafted documentation, including most of this README.
 
-My role: the product concept, spec, architecture direction, stack and
+In essence, I worked as the senior engineering manager, directing goals, performing research on both the technology and architecture as well as the product, stepping in during difficult technical challenges to write code and debug, after reviewing the sponsor documentation manually.
+
+My role expanded (not exhaustive): the product concept, spec, architecture direction, stack and
 integration choices, milestone sequencing and cuts, brand system and assets,
 all sponsor-account/key/faucet operations, and accept/reject decisions at
 every checkpoint — each milestone was reviewed and verified working
@@ -48,7 +50,7 @@ teams, what to cut) were decided by me.
 | Area | Origin |
 |---|---|
 | `docs/SPEC.md` (project brief) | Human-written before the build |
-| `assets/` (logo, comparison graphic) | Human-made |
+| `assets/` (logo, comparison graphic) | AI-drafted, human-edited and directed |
 | `src/`, `sidecar/`, `scripts/`, `migrations/`, `public/` | AI-generated from the spec, human-reviewed at checkpoints |
 | `wrangler.jsonc`, config files | AI-generated, human-reviewed |
 | README + docs | AI-drafted, human-edited and directed |
@@ -57,6 +59,4 @@ teams, what to cut) were decided by me.
 
 The commit history is the audit trail of the loop: small, scoped commits, each
 a reviewed working state ("demoable `main` after every milestone" is a spec
-rule). Sponsor-facing claims worth checking against it: no mocked chain calls,
-no faked transaction results — that's also a spec rule, and the code fails
-loudly instead.
+rule).
