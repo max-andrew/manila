@@ -33,7 +33,7 @@
   /* top bar */
   .topbar { display: flex; align-items: center; justify-content: space-between;
             padding-bottom: 1.25rem; border-bottom: 1px solid var(--line); }
-  .logo { height: 62px; width: auto; display: block; }
+  .logo { height: 60px; width: auto; display: block; }
   .topbar nav { display: flex; align-items: center; gap: 1rem; }
   .chain { font-family: var(--mono); font-size: .72rem; letter-spacing: .04em; color: var(--khaki);
            border: 1px solid var(--line); border-radius: 999px; padding: .25rem .6rem;
@@ -61,7 +61,12 @@
   .card { background: #fff; border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow);
           padding: 1.15rem 1.2rem; }
   .card > h2 { font-size: .7rem; text-transform: uppercase; letter-spacing: .15em; color: var(--khaki);
-               font-weight: 600; padding-bottom: .7rem; border-bottom: 1px solid var(--line); margin-bottom: .9rem; }
+               font-weight: 600; padding-bottom: .7rem; border-bottom: 1px solid var(--line); margin-bottom: .9rem;
+               display: flex; align-items: center; justify-content: space-between; }
+  .mode { font-family: var(--mono); font-size: .6rem; letter-spacing: .08em; text-transform: none; font-weight: 400;
+          color: var(--khaki); border: 1px solid var(--line); border-radius: 999px; padding: .1rem .5rem; cursor: help; }
+  .mode .d { color: #4f7a52; }
+  .agent-foot { font-size: .68rem; color: var(--khaki); margin-top: .7rem; line-height: 1.45; }
 
   /* treasury */
   #treasury-balance { font-family: var(--mono); font-size: 2.1rem; letter-spacing: -.01em; margin: .1rem 0 .15rem; }
@@ -108,7 +113,9 @@
   .badge.released { color: #fff; background: var(--ink); }
 
   /* audit */
+  .audit-scroll { max-height: 21rem; overflow-y: auto; margin: -0.2rem -0.2rem 0; }
   #audit-table { font-size: .76rem; }
+  #audit-table thead th { position: sticky; top: 0; background: #fff; z-index: 1; }
   .seal a { font-family: var(--mono); font-size: .72rem; color: var(--khaki); text-decoration: none; white-space: nowrap; }
   .seal a:hover { color: var(--ink); }
   .explorer-links { margin-top: .7rem; display: flex; flex-wrap: wrap; gap: .15rem .9rem; }
@@ -137,7 +144,7 @@
 <div class="wrap">
 
   <header class="topbar">
-    <img class="logo" src="/assets/manila_logo_lockup.png" alt="Manila — the pay envelope, rebuilt onchain">
+    <img class="logo" src="/assets/manila_logo_mark.png" alt="Manila — the pay envelope, rebuilt onchain">
     <nav>
       <span class="chain"><span class="dot" id="status-dot"></span><span id="status">connecting…</span></span>
       <a class="gh" href="https://github.com/max-andrew/manila" target="_blank" rel="noopener"
@@ -171,7 +178,7 @@
     </section>
 
     <section class="card" id="agent">
-      <h2>Agent</h2>
+      <h2>Agent <span class="mode" title="The agent runs payroll on demand right now. The same flow can run on a schedule via a Cloudflare Cron Trigger (or a per-employer Durable Object alarm) — hands-off daily payroll, kept safe by the policy controls."><span class="d">●</span> Manual mode</span></h2>
       <div id="approval-banner" hidden></div>
       <div id="chat-log"><div class="placeholder">Tell the agent to run today's payroll. It drafts the run, checks policy, and seals it — or holds for approval, or refuses.</div></div>
       <div class="chips" id="chips">
@@ -184,16 +191,19 @@
         <input id="chat-input" type="text" placeholder="Run today's payroll" />
         <button type="submit" id="chat-send">Send</button>
       </form>
+      <p class="agent-foot">Running in <b>manual mode</b>. Flip on a daily <b>Cloudflare Cron Trigger</b> and the same agent runs payroll every morning, hands-off — safe to leave unattended because the policy controls can't be talked past, and an over-cap run still waits for your signature.</p>
     </section>
 
     <section class="card" id="audit">
       <h2>Audit</h2>
-      <table id="audit-table">
-        <thead><tr><th>When</th><th>Actor</th><th>Action</th><th>Policy</th><th>Seal</th></tr></thead>
-        <tbody></tbody>
-      </table>
+      <div class="audit-scroll">
+        <table id="audit-table">
+          <thead><tr><th>When</th><th>Actor</th><th>Action</th><th>Policy</th><th>Seal</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
       <a id="csv-link" class="envelope-btn" href="/api/audit.csv" title="Download the complete audit trail as CSV">
-        <span class="env-main">Open the envelope ↓</span>
+        <span class="env-main">Get the envelope archive ↓</span>
         <span class="env-sub">Download the full audit trail (CSV)</span>
       </a>
     </section>
@@ -294,9 +304,10 @@ async function refreshApproval() {
   if (pending && (!released || released.id < pending.id)) {
     let reason = '';
     try { reason = JSON.parse(pending.detail).reason || ''; } catch {}
-    banner.innerHTML = `<span class="badge pending">PENDING APPROVAL</span>
-      <div style="margin:.5rem 0 .1rem"><span class="who">Run ${pending.run_id}</span> needs a second signature on the envelope. ${esc(reason)}</div>
-      <button data-run="${pending.run_id}">Add second signature</button>`;
+    const dup = /already|again/i.test(reason);
+    banner.innerHTML = `<span class="badge pending">${dup ? 'CONFIRM' : 'PENDING APPROVAL'}</span>
+      <div style="margin:.5rem 0 .1rem"><span class="who">Run ${pending.run_id}</span> ${dup ? esc(reason) + '.' : 'needs a second signature on the envelope. ' + esc(reason)}</div>
+      <button data-run="${pending.run_id}">${dup ? 'Confirm — pay again' : 'Add second signature'}</button>`;
     banner.hidden = false;
     banner.querySelector('button').onclick = approve;
   } else {
