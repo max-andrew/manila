@@ -2,7 +2,9 @@
 
 *This is the working spec I wrote before the build and gave to Claude Code as
 its standing instructions, committed per ETHGlobal's AI-usage guidance that
-spec and planning artifacts belong in the repo. Light edits for secrets only.
+spec and planning artifacts belong in the repo. Lightly edited for committing:
+secrets and session-specific instructions to the assistant removed; all
+product, architecture, milestone, and rules content as written.
 See [AI_USAGE.md](./AI_USAGE.md) for how the AI was used against this spec.*
 
 ---
