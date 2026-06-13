@@ -37,7 +37,11 @@
   /* top bar */
   .topbar { display: flex; align-items: center; justify-content: space-between;
             padding-bottom: 1.25rem; border-bottom: 1px solid var(--line); }
-  .logo { height: 60px; width: auto; display: block; }
+  .brand { display: flex; align-items: center; gap: .7rem; text-decoration: none; }
+  .logo { height: 50px; width: auto; display: block; }
+  .brand-text { display: flex; flex-direction: column; line-height: 1.04; }
+  .wordmark { font-family: var(--sans); font-weight: 700; font-size: 1.55rem; color: var(--ink); letter-spacing: -.015em; }
+  .brand-tag { font-family: var(--mono); font-size: .62rem; color: var(--khaki); letter-spacing: .01em; margin-top: .22rem; }
   .topbar nav { display: flex; align-items: center; gap: 1rem; }
   .chain { font-family: var(--mono); font-size: .72rem; letter-spacing: .04em; color: var(--khaki);
            border: 1px solid var(--line); border-radius: 999px; padding: .25rem .6rem;
@@ -200,7 +204,13 @@
 <div class="wrap">
 
   <header class="topbar">
-    <img class="logo" src="/assets/manila_logo_mark.png" alt="Manila — the pay envelope, rebuilt onchain">
+    <a class="brand" href="/" aria-label="Manila — the pay envelope, rebuilt onchain">
+      <img class="logo" src="/assets/manila_mark.png" alt="">
+      <span class="brand-text">
+        <span class="wordmark">Manila</span>
+        <span class="brand-tag">The pay envelope, rebuilt onchain.</span>
+      </span>
+    </a>
     <nav>
       <span class="chain"><span class="dot" id="status-dot"></span><span id="status">connecting…</span></span>
       <a class="gh" href="https://github.com/max-andrew/manila" target="_blank" rel="noopener" aria-label="View source on GitHub" title="View source on GitHub">
