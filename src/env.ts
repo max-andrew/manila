@@ -9,6 +9,10 @@ export type Env = {
   DYNAMIC_ENV_ID: string;
   UNLINK_API_KEY: string;
   TREASURY_UNLINK_MNEMONIC: string;
+  // Privacy-pool token on the Unlink network. On arc-testnet this is the mock
+  // USDCm, not native USDC. Defaults to native USDC if unset.
+  UNLINK_TOKEN_ADDRESS: string;
+  UNLINK_TOKEN_DECIMALS: string;
   ARC_RPC_URL: string;
   TREASURY_WALLET_ID: string;
   TREASURY_WALLET_ADDRESS: string;

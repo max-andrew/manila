@@ -16,7 +16,6 @@ const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '..');
 const OUT = join(here, '.unlink-accounts.json');
 const ENV_NAME = 'arc-testnet';
-const USDC = '0x3600000000000000000000000000000000000000';
 
 const vars = Object.fromEntries(
   readFileSync(join(root, '.dev.vars'), 'utf8')
@@ -25,6 +24,10 @@ const vars = Object.fromEntries(
     .map((l) => [l.slice(0, l.indexOf('=')).trim(), l.slice(l.indexOf('=') + 1).trim()])
 );
 const apiKey = process.env.UNLINK_API_KEY ?? vars.UNLINK_API_KEY;
+// Privacy-pool token. arc-testnet uses a mock token (USDCm) the faucet mints —
+// not native USDC. Set UNLINK_TOKEN_ADDRESS in .dev.vars to the USDCm address.
+const USDC =
+  process.env.UNLINK_TOKEN_ADDRESS ?? vars.UNLINK_TOKEN_ADDRESS ?? '0x3600000000000000000000000000000000000000';
 if (!apiKey) {
   console.error('UNLINK_API_KEY missing (set in .dev.vars)');
   process.exit(1);

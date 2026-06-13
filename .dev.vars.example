@@ -13,6 +13,10 @@ DYNAMIC_ENV_ID=
 UNLINK_API_KEY=
 # Treasury's private-account mnemonic (printed by scripts/setup-unlink.mjs)
 TREASURY_UNLINK_MNEMONIC=
+# Privacy-pool token. On arc-testnet this is the mock USDCm the faucet mints
+# (from your Unlink dashboard's faucet list), NOT native USDC. Decimals too.
+UNLINK_TOKEN_ADDRESS=
+UNLINK_TOKEN_DECIMALS=6
 
 # Arc testnet
 ARC_RPC_URL=

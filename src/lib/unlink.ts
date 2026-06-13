@@ -39,10 +39,16 @@ export async function sealTransfer(
 ): Promise<{ ref: string }> {
   const client = treasuryUnlinkClient(env);
   await client.ensureRegistered();
+  // On arc-testnet the privacy pool holds a mock token (USDCm), not native
+  // USDC — configurable, with native USDC as the mainnet default. Salary
+  // amounts are 6-decimal micro-USD; scale to the pool token's decimals.
+  const token = env.UNLINK_TOKEN_ADDRESS || ARC_USDC_ADDRESS;
+  const decimals = Number(env.UNLINK_TOKEN_DECIMALS || '6');
+  const amount = (BigInt(amountMicro) * 10n ** BigInt(Math.max(0, decimals - 6))).toString();
   const tx = await client.transfer({
     recipientAddress: recipientUnlinkAddress,
-    token: ARC_USDC_ADDRESS,
-    amount: String(amountMicro),
+    token,
+    amount,
   } as Parameters<typeof client.transfer>[0]);
   const result = await tx.wait();
   if ((result as { status?: string }).status === 'failed') {
