@@ -197,6 +197,11 @@
   .amt { font-family: var(--mono); font-variant-numeric: tabular-nums; }
   .paid { font-family: var(--mono); font-size: .68rem; color: #4f7a52; text-decoration: none; white-space: nowrap; }
   .unpaid { font-family: var(--mono); font-size: .68rem; color: var(--khaki); }
+  .paid-today { font-family: var(--mono); font-size: .58rem; letter-spacing: .04em; color: #3f6f47; background: #eef5ee; border: 1px solid #cfe0cf; border-radius: 999px; padding: .08rem .42rem; margin-left: .5rem; white-space: nowrap; vertical-align: middle; }
+  .run-status { font-family: var(--mono); font-size: .58rem; letter-spacing: .04em; margin-left: .5rem; text-transform: none; }
+  .run-status.done { color: #3f6f47; }
+  .run-status.part { color: #9a7b2e; }
+  .run-status.none { color: var(--khaki); }
   .rate-input { width: 4.5rem; font-family: var(--mono); font-size: .78rem; padding: .2rem .35rem; border: 1px solid var(--line); border-radius: 5px; text-align: right; }
   .rm-btn { background: none; border: none; color: var(--stamp); font-size: 1rem; padding: 0 .3rem; cursor: pointer; line-height: 1; }
   .rm-btn:hover { background: none; }
@@ -414,7 +419,15 @@ function renderRoster(employees, balances = {}) {
     table.querySelectorAll('.rm-btn').forEach(b => b.onclick = () => removeEmployee(b.dataset.id));
     table.querySelectorAll('.rate-input').forEach(i => i.onchange = () => updateRate(i.dataset.id, i.value));
   } else {
-    const foot = employees.length ? `<tfoot><tr><td>Total · per day</td><td></td><td class="amt r">${usd(total)}</td></tr></tfoot>` : '';
+    const paidCount = employees.filter(e => e.paid_today).length;
+    const status = employees.length
+      ? (paidCount === employees.length
+          ? `<span class="run-status done">● all ${employees.length} paid today</span>`
+          : paidCount > 0
+            ? `<span class="run-status part">● ${paidCount} of ${employees.length} paid today</span>`
+            : `<span class="run-status none">● not run today</span>`)
+      : '';
+    const foot = employees.length ? `<tfoot><tr><td>Total · per day ${status}</td><td></td><td class="amt r">${usd(total)}</td></tr></tfoot>` : '';
     table.innerHTML = `<thead><tr><th>Name</th><th class="r">Sealed balance</th><th class="r">Per day</th></tr></thead><tbody>${
       employees.map(e => {
         const bal = balances ? balances[e.id] : null;
@@ -422,7 +435,8 @@ function renderRoster(employees, balances = {}) {
         const cell = has
           ? `<a class="paid" ${e.last_seal_ref ? `href="${EXPLORER}${e.last_seal_ref}" target="_blank" rel="noopener"` : ''} title="Private balance — visible to the employer, hidden on the public explorer${e.last_seal_ref ? ' · click for the on-chain transaction' : ''}">$${bal}${e.last_seal_ref ? '&nbsp;↗' : ''}</a>`
           : `<span class="unpaid">$0.00</span>`;
-        return `<tr><td>${esc(e.name)}</td><td class="amt r">${cell}</td><td class="amt r">${usd(e.salary_micro)}</td></tr>`;
+        const tag = e.paid_today ? '<span class="paid-today" title="Salary sealed today">✓ paid today</span>' : '';
+        return `<tr><td>${esc(e.name)}${tag}</td><td class="amt r">${cell}</td><td class="amt r">${usd(e.salary_micro)}</td></tr>`;
       }).join('') || empty
     }</tbody>${foot}`;
   }

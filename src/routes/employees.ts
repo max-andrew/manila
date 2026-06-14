@@ -49,12 +49,18 @@ async function setAllowlist(env: Env, mutate: (list: string[]) => string[]) {
     .run();
 }
 
-// Roster with each employee's latest sealed payment (for the "got paid" view).
+// Roster with each employee's latest sealed payment (for the "got paid" view),
+// plus a paid_today flag — a salary sealed today and since the last demo reset,
+// matching the agent's double-pay guard.
 employeesApp.get('/employees', async (c) => {
   const { results } = await c.env.DB.prepare(
     `SELECT e.id, e.name, e.wallet, e.salary_micro, e.schedule, e.unlink_address,
        (SELECT p.unlink_ref FROM payments p WHERE p.employee_id = e.id AND p.status = 'sealed' ORDER BY p.id DESC LIMIT 1) AS last_seal_ref,
-       (SELECT p.created_at FROM payments p WHERE p.employee_id = e.id AND p.status = 'sealed' ORDER BY p.id DESC LIMIT 1) AS last_paid_at
+       (SELECT p.created_at FROM payments p WHERE p.employee_id = e.id AND p.status = 'sealed' ORDER BY p.id DESC LIMIT 1) AS last_paid_at,
+       (SELECT COUNT(*) FROM payments p WHERE p.employee_id = e.id AND p.status = 'sealed'
+          AND date(p.created_at) = date('now')
+          AND p.created_at > COALESCE((SELECT value FROM app_state WHERE key = 'reset_at'), '1970-01-01 00:00:00')
+       ) AS paid_today
      FROM employees e ORDER BY e.id`
   ).all();
   return c.json(results);
