@@ -57,6 +57,10 @@
   .hero { display: grid; grid-template-columns: 1fr 1.04fr; gap: 2.2rem; align-items: center; padding: 1.5rem 0 1.6rem; }
   .hero h1 { font-size: 2rem; font-weight: 700; letter-spacing: -0.025em; line-height: 1.12; }
   .hero p { margin-top: .85rem; color: var(--khaki); font-size: 1rem; max-width: 46ch; }
+  .rails { list-style: none; margin: .7rem 0 0; padding: 0; max-width: 48ch; display: flex; flex-direction: column; gap: .55rem; }
+  .rails li { position: relative; padding-left: 1.1rem; color: var(--khaki); font-size: .94rem; line-height: 1.45; }
+  .rails li::before { content: ''; position: absolute; left: 0; top: .5em; width: .42rem; height: .42rem; background: var(--manila); border-radius: 2px; }
+  .rails li b { color: var(--ink); }
   .hero b { color: var(--ink); font-weight: 600; }
   .hero figure { margin: 0; background: #fff; border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); padding: 1rem 1.1rem; }
   .hero figure img { width: 100%; height: auto; display: block; }
@@ -146,9 +150,13 @@
   .vest-act { text-align: right; }
   .vest-amt { font-family: var(--mono); font-size: 1.05rem; color: var(--ink); }
   .vest-amt .sub { display: block; font-size: .58rem; color: var(--khaki); text-transform: uppercase; letter-spacing: .1em; }
-  .vest-release-btn { margin-top: .35rem; font-family: var(--mono); font-size: .66rem; letter-spacing: .03em; color: var(--paper); background: var(--ink); border: none; border-radius: 6px; padding: .3rem .6rem; cursor: pointer; }
+  .vest-btns { display: flex; flex-direction: column; gap: .3rem; align-items: flex-end; margin-top: .35rem; }
+  .vest-release-btn { font-family: var(--mono); font-size: .66rem; letter-spacing: .03em; color: var(--paper); background: var(--ink); border: none; border-radius: 6px; padding: .3rem .6rem; cursor: pointer; }
   .vest-release-btn:hover { background: #000; }
   .vest-release-btn:disabled { opacity: .5; cursor: default; }
+  .vest-reset-btn { font-family: var(--mono); font-size: .62rem; letter-spacing: .03em; color: var(--khaki); background: none; border: 1px solid var(--line); border-radius: 6px; padding: .26rem .55rem; cursor: pointer; }
+  .vest-reset-btn:hover { color: var(--ink); border-color: var(--khaki); }
+  .vest-reset-btn:disabled { opacity: .45; cursor: default; }
   .vest-status { font-size: .74rem; color: var(--khaki); margin-top: .7rem; min-height: 0; }
   .vest-status:empty { display: none; }
   .vest-status.ok { color: #3f6f47; }
@@ -268,7 +276,11 @@
   <section class="hero">
     <div>
       <h1>Confidential USDC payroll, paid daily by an agent.</h1>
-      <p>Under <b>1% of payroll</b> runs on stablecoins — a public chain turns every salary into a permanent public record. Manila seals it back up and pays the team <b>every day</b>: gas-free nanopayments make per-day payroll cost a fraction of a cent — impractical on ACH or wire. An agent runs it from plain English, under policy controls no instruction can talk past. Longer-horizon pay <b>vests on-chain</b> too — an equity-style cliff held in a USDC vault the agent releases as it accrues, publicly verifiable on Arc.</p>
+      <p>Under <b>1% of payroll</b> runs on stablecoins — a public chain turns every salary into a permanent public record. Manila gives an agent two USDC rails, run from plain English under policy controls no instruction can talk past:</p>
+      <ul class="rails">
+        <li><b>Sealed daily salary</b> — private transfers paid <b>every day</b>; gas-free nanopayments make per-day payroll cost a fraction of a cent, impractical on ACH or wire.</li>
+        <li><b>Programmable vesting</b> — equity-style cliffs streamed from an on-chain USDC vault the agent releases as they accrue, publicly verifiable on Arc.</li>
+      </ul>
     </div>
     <figure>
       <img src="/assets/manila_public_vs_sealed_comparison.png" alt="The same three salaries: fully public on a normal chain, sealed on Manila with an employer-only audit export.">
@@ -449,10 +461,10 @@ function renderVesting(v) {
   el('vesting-badge').textContent = 'deployed · arc testnet';
   const m = v.vault;
   el('vesting-links').innerHTML = [
-    `<a href="${m.source_url}" target="_blank" rel="noopener" title="PayrollVault.sol — the Solidity source">Contract source&nbsp;↗</a>`,
+    `<a href="${m.source_url}" target="_blank" rel="noopener" title="PayrollVaultV2.sol — the Solidity source">Contract source&nbsp;↗</a>`,
     `<a href="${m.address_url}" target="_blank" rel="noopener" title="${m.address}">Deployed contract&nbsp;↗</a>`,
-    `<a href="${m.schedule_tx_url}" target="_blank" rel="noopener" title="A real schedule funded on Arc">Proof: vest&nbsp;↗</a>`,
-    `<a href="${m.release_tx_url}" target="_blank" rel="noopener" title="A real release paid out on Arc">release&nbsp;↗</a>`,
+    `<a href="${m.deploy_tx_url}" target="_blank" rel="noopener" title="Deployment on Arc">Deploy tx&nbsp;↗</a>`,
+    `<a href="${m.schedule_tx_url}" target="_blank" rel="noopener" title="A real schedule funded on Arc">Schedule tx&nbsp;↗</a>`,
   ].join('');
 
   const rows = v.schedules || [];
@@ -469,12 +481,42 @@ function renderVesting(v) {
       </div>
       <div class="vest-act">
         <div class="vest-amt">$${s.releasable_usd}<span class="sub">releasable</span></div>
-        <button class="vest-release-btn" data-name="${esc(s.name)}"${signerOnline ? '' : ' disabled title="Dynamic signer offline — start judge-mode to release"'}>Release ↗</button>
+        <div class="vest-btns">
+          <button class="vest-release-btn" data-name="${esc(s.name)}"${signerOnline ? '' : ' disabled title="Dynamic signer offline — start judge-mode to release"'}>Release ↗</button>
+          <button class="vest-reset-btn" data-addr="${s.beneficiary}"${signerOnline ? '' : ' disabled'} title="Re-arm the vesting clock so a slice is releasable again">↻ Reset clock</button>
+        </div>
       </div>
     </div>`).join('');
   el('vesting-body').querySelectorAll('.vest-release-btn').forEach(b =>
     b.onclick = () => releaseVested(b.dataset.name, b)
   );
+  el('vesting-body').querySelectorAll('.vest-reset-btn').forEach(b =>
+    b.onclick = () => rearmVesting(b.dataset.addr, b)
+  );
+}
+
+// Re-arm the vesting clock so a slice is immediately releasable — keeps the
+// release flow demoable even after the schedule has been drained down.
+async function rearmVesting(addr, btn) {
+  const status = el('vesting-status');
+  btn.disabled = true; btn.textContent = '…';
+  status.className = 'vest-status'; status.textContent = 'Re-arming the vesting clock — signed by the Dynamic wallet…';
+  try {
+    const res = await fetch('/api/vesting/reset', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ beneficiary: addr }) });
+    const data = await res.json();
+    if (data.reset) {
+      status.className = 'vest-status ok';
+      status.innerHTML = `Clock re-armed — $${esc(data.releasable_usd)} now releasable${data.explorer_url ? ` · <a href="${data.explorer_url}" target="_blank" rel="noopener">view tx&nbsp;↗</a>` : ''}.`;
+    } else {
+      status.className = 'vest-status err';
+      status.textContent = data.error || 'Reset did not complete — the Dynamic signer may be offline (start judge-mode).';
+    }
+  } catch (err) {
+    status.className = 'vest-status err';
+    status.textContent = 'Reset failed: ' + err.message;
+  }
+  btn.disabled = false; btn.textContent = '↻ Reset clock';
+  await load();
 }
 
 // Release a beneficiary's vested USDC via the agent, with feedback right on the
