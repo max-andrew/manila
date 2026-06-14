@@ -11,7 +11,7 @@
 import { Hono } from 'hono';
 import { x402Client, x402HTTPClient } from '@x402/core/client';
 import { registerBatchScheme } from '@circle-fin/x402-batching/client';
-import { dynamicSigner } from '../lib/signer';
+import { dynamicSigner, activeSignerAddress } from '../lib/signer';
 import { audit } from '../lib/audit';
 import { microToUsd } from '../lib/arc';
 import { sealApp, SEAL_FEE_MICRO } from './seal';
@@ -45,7 +45,7 @@ export async function executeRun(env: Env, runId: number): Promise<{
 
   const core = new x402Client();
   registerBatchScheme(core, {
-    signer: dynamicSigner(env, env.TREASURY_WALLET_ADDRESS as `0x${string}`) as never,
+    signer: dynamicSigner(env, await activeSignerAddress(env)) as never,
   });
   const http = new x402HTTPClient(core);
 

@@ -10,7 +10,7 @@
 
 import { createPublicClient, http, encodeFunctionData } from 'viem';
 import { arcTestnet, ARC_TESTNET_CHAIN_ID, explorerTxUrl, explorerAddressUrl } from './arc';
-import { signTransaction } from './signer';
+import { signTransaction, activeSignerAddress } from './signer';
 import type { Env } from '../env';
 
 // Deployed on Arc testnet. Constructor: usdc = native USDC's ERC-20 interface,
@@ -122,7 +122,10 @@ export type ReleaseResult = {
 export async function releaseVesting(env: Env, beneficiary: string): Promise<ReleaseResult> {
   const client = publicClient(env);
   const addr = beneficiary as `0x${string}`;
-  const from = env.TREASURY_WALLET_ADDRESS as `0x${string}`;
+  // The active Dynamic wallet signs and sends; it must be the vault's releaser
+  // (the configured treasury) for release() to authorize — switching the signer
+  // to another wallet makes the call revert, which is the security boundary.
+  const from = await activeSignerAddress(env);
 
   const releasable = (await client.readContract({
     address: PAYROLL_VAULT_ADDRESS,
