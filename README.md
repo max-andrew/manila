@@ -12,28 +12,11 @@ A real agent-driven payroll run has settled on Arc testnet — three salaries se
 
 ## Architecture
 
-```mermaid
-flowchart LR
-  Employer -->|plain-English command| Agent["Agent (Workers AI tool use,<br/>Cloudflare Worker)"]
-  Agent --> Policy["Policy engine<br/>cap + allowlist"]
-  Policy -->|over policy| Approval["Pending approval<br/>(maker-checker)"]
-  Approval -->|second signature| Seal
-  Policy -->|pass| Seal["Seal service<br/>(402-protected, per employee)"]
-  Agent -->|x402 nanopayment per disbursement| Seal
-  Sidecar["Signing sidecar (Node)<br/>Dynamic server wallet, MPC"] -->|signs payment authorizations| Agent
-  Seal -->|batched micro-settlement| Gateway["Circle Gateway<br/>netted settlement on Arc"]
-  Seal -->|sealed salary transfer| Unlink["Unlink private account<br/>amounts + counterparties hidden"]
-  Unlink --> Employees
-  Agent -->|release vested RSUs| Vault["PayrollVaultV3 (Arc)<br/>RSU vesting, USDC-settled"]
-  Oracle["Pyth price relay (Arc)<br/>live AAPL/USD via Hermes"] -->|share price| Vault
-  Sidecar -->|signs release| Vault
-  Vault -->|USDC payout, publicly verifiable| Employees
-  Agent --> Audit["Audit log to CSV export"]
-  Seal --> Audit
-  Vault --> Audit
-```
+<p align="center">
+  <img src="docs/diagrams/system.png" alt="Manila system architecture: one AI agent (Cloudflare Worker) operating two Dynamic-signed rails — sealed daily salary via Unlink and Circle Gateway, and oracle-priced equity vesting via PayrollVaultV3 — settled on Arc." width="880">
+</p>
 
-*Full diagrams (system + the oracle/RSU flow): [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).*
+*One AI agent, two Dynamic-signed rails, on Arc. Editable source + the step-by-step oracle/RSU flow below are in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).*
 
 Two disbursement rails, both agent-operated and Dynamic-signed. **Sealed daily salary** (the private path, above). **Programmable equity** — RSU grants vest on-chain in [`PayrollVaultV3`](contracts/README.md); on release the contract reads a live company share price from an on-chain Pyth-shaped oracle and pays the vested shares' value in USDC, so the grant tracks the real stock but settles in stablecoin — the publicly-verifiable counterpart to the sealed rail.
 
@@ -61,6 +44,10 @@ Each integration is load-bearing — remove it and the product stops working, no
 ## Programmable equity vesting (Arc — Advanced Stablecoin Logic)
 
 The second rail is **equity that pays in cash**: [`PayrollVaultV3`](contracts/README.md) vests **RSU shares** (cliff + linear) and, on release, reads a **live company share price from an on-chain oracle** and pays the vested shares' value in **USDC** — so a grant tracks the real stock but settles in stablecoin. This is the Arc *Advanced Stablecoin Logic* track: multi-step settlement (oracle read → share→USDC conversion → transfer) plus `resetClock` re-arming and `topUp`, 20 passing Foundry tests.
+
+<p align="center">
+  <img src="docs/diagrams/rsu-oracle.png" alt="Oracle-priced RSU vesting: the employer grants RSU shares and funds a USDC pool; a relayer posts the live AAPL/USD price from Pyth Hermes on-chain; on the agent's Dynamic-signed release(), the contract reads the oracle, converts vested shares to USDC, and transfers — equity settled in cash, verifiable on Arc." width="820">
+</p>
 
 - **Oracle.** The vault reads the standard Pyth `IPyth` interface. On Arc we provide [`PythPriceRelay`](contracts/src/PythPriceRelay.sol) — fed the real **AAPL/USD** price from Pyth's free [Hermes](https://hermes.pyth.network) feed (`scripts/oracle-push.mjs`) — so it's a drop-in for canonical Pyth (an address swap, no code change). The release payout literally tracks Apple's share price; raise the oracle and the same vested shares pay more USDC.
 - **Agent-operated.** The Dynamic server wallet is the vault's `releaser`; the agent releases (and re-arms) tranches on command, signed in the sidecar — every release a real, publicly verifiable USDC transfer on Arc, logged to the same audit trail.
