@@ -3,12 +3,28 @@
 // release vested USDC (signed by the Dynamic releaser in the sidecar).
 
 import { Hono } from 'hono';
-import { readVaultSchedule, resetVestingClock, readOraclePrice, vaultMeta, type VestingSchedule } from '../lib/vault';
+import { readVaultSchedule, resetVestingClock, releaseVesting, readOraclePrice, vaultMeta, type VestingSchedule } from '../lib/vault';
 import { explorerAddressUrl } from '../lib/arc';
 import { audit } from '../lib/audit';
 import type { Env } from '../env';
 
 export const vestingApp = new Hono<{ Bindings: Env }>();
+
+// Release vested equity for a beneficiary — the direct path the Release button
+// uses (no LLM hop), signed by the Dynamic releaser. The chat command "release
+// X's vested equity" still goes through the agent.
+vestingApp.post('/vesting/release', async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const beneficiary = String(body.beneficiary ?? '').trim();
+  if (!/^0x[0-9a-fA-F]{40}$/.test(beneficiary)) return c.json({ error: 'valid beneficiary required' }, 400);
+  try {
+    const result = await releaseVesting(c.env, beneficiary);
+    await audit(c.env.DB, { actor: 'agent', action: result.released ? 'vesting_released' : 'vesting_release_failed', detail: { beneficiary, amount_micro: result.amount_micro, tx_hash: result.tx_hash, error: result.error } });
+    return c.json(result, result.released ? 200 : 502);
+  } catch (err) {
+    return c.json({ error: err instanceof Error ? err.message : String(err) }, 502);
+  }
+});
 
 // Re-arm a schedule's clock so a slice is immediately releasable — the agent
 // (Dynamic releaser) signs it. Keeps the release flow reliably demoable.

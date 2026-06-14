@@ -204,11 +204,13 @@ export async function resetVestingClock(env: Env, beneficiary: string): Promise<
   if (!exists) return { reset: false, beneficiary, error: 'no schedule for this beneficiary' };
   if (total - released === 0n) return { reset: false, beneficiary, error: 'fully released — nothing left to re-arm' };
 
-  // Re-arm over a ~30-minute clock, ~12.5% vested immediately: visibly grows,
-  // cliff already passed, stays well short of fully vesting during a demo.
-  const dur = 1800;
+  // Re-arm over a long (2-day) clock with ~25% already vested: a slice is
+  // immediately releasable and the cliff is passed, but the grant can't fully
+  // vest during a demo — so a single release never drains it. Each reset re-arms
+  // the remaining shares, shrinking geometrically, never reaching zero.
+  const dur = 172800;
   const now = Math.floor(Date.now() / 1000);
-  const start = BigInt(now - Math.floor(dur / 8));
+  const start = BigInt(now - Math.floor(dur / 4));
   const data = encodeFunctionData({ abi: VAULT_ABI, functionName: 'resetClock', args: [addr, start, start, BigInt(dur)] });
   const hash = await sendFromReleaser(env, data);
   const receipt = await client.waitForTransactionReceipt({ hash });

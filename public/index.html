@@ -510,13 +510,13 @@ function renderVesting(v) {
       <div class="vest-act">
         <div class="vest-amt">$${s.releasable_usd}<span class="sub">releasable</span></div>
         <div class="vest-btns">
-          <button class="vest-release-btn" data-name="${esc(s.name)}"${signerOnline ? '' : ' disabled title="Reconnecting to the Dynamic signer — refresh in a moment"'}>Release ↗</button>
+          <button class="vest-release-btn" data-name="${esc(s.name)}" data-addr="${s.beneficiary}"${signerOnline ? '' : ' disabled title="Reconnecting to the Dynamic signer — refresh in a moment"'}>Release ↗</button>
           <button class="vest-reset-btn" data-addr="${s.beneficiary}"${signerOnline ? '' : ' disabled'} title="Re-arm the vesting clock so a slice is releasable again">↻ Reset clock</button>
         </div>
       </div>
     </div>`).join('');
   el('vesting-body').querySelectorAll('.vest-release-btn').forEach(b =>
-    b.onclick = () => releaseVested(b.dataset.name, b)
+    b.onclick = () => releaseVested(b.dataset.name, b.dataset.addr, b)
   );
   el('vesting-body').querySelectorAll('.vest-reset-btn').forEach(b =>
     b.onclick = () => rearmVesting(b.dataset.addr, b)
@@ -549,25 +549,23 @@ async function rearmVesting(addr, btn) {
   await load();
 }
 
-// Release a beneficiary's vested USDC via the agent, with feedback right on the
-// card (the chat log is far above — routing only there felt like a no-op).
-async function releaseVested(name, btn) {
+// Release a beneficiary's vested equity directly (no LLM hop, so the button is
+// fast and reliable), signed by the Dynamic releaser. The chat command "release
+// X's vested equity" still goes through the agent.
+async function releaseVested(name, addr, btn) {
   const status = el('vesting-status');
   vestingBusy = true;
   btn.disabled = true; btn.textContent = 'releasing…';
-  status.className = 'vest-status'; status.textContent = `Releasing ${name}'s vested USDC — signed by the Dynamic wallet…`;
+  status.className = 'vest-status'; status.textContent = `Releasing ${name}'s vested equity — signed by the Dynamic wallet…`;
   try {
-    const res = await fetch('/api/agent', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ message: `Release ${name}'s vested pay` }) });
+    const res = await fetch('/api/vesting/release', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ beneficiary: addr }) });
     const data = await res.json();
-    addMsg('You', `Release ${name}'s vested pay`);
-    addMsg('Agent', data.reply || data.error || 'No response.');
-    const tx = data.run && data.run.explorer_url;
-    if (data.run && data.run.released) {
+    if (data.released) {
       status.className = 'vest-status ok';
-      status.innerHTML = `Released ${esc(data.run.amount_usd ? '$' + data.run.amount_usd : '')} to ${esc(name)} on-chain${tx ? ` · <a href="${tx}" target="_blank" rel="noopener">view tx&nbsp;↗</a>` : ''}.`;
+      status.innerHTML = `Released ${esc(name)}'s vested equity, worth $${esc(data.amount_usd)}, settled in USDC${data.explorer_url ? ` · <a href="${data.explorer_url}" target="_blank" rel="noopener">view tx&nbsp;↗</a>` : ''}.`;
     } else {
       status.className = 'vest-status err';
-      status.textContent = data.reply || 'Release did not complete — reconnecting to the Dynamic signer, try again in a moment.';
+      status.textContent = data.error || 'Release did not complete — reconnecting to the Dynamic signer, try again in a moment.';
     }
   } catch (err) {
     status.className = 'vest-status err';
