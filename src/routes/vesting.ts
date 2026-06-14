@@ -3,7 +3,7 @@
 // release vested USDC (signed by the Dynamic releaser in the sidecar).
 
 import { Hono } from 'hono';
-import { readVaultSchedule, resetVestingClock, vaultMeta, type VestingSchedule } from '../lib/vault';
+import { readVaultSchedule, resetVestingClock, readOraclePrice, vaultMeta, type VestingSchedule } from '../lib/vault';
 import { explorerAddressUrl } from '../lib/arc';
 import { audit } from '../lib/audit';
 import type { Env } from '../env';
@@ -34,8 +34,8 @@ vestingApp.get('/vesting', async (c) => {
     'SELECT id, name, wallet FROM employees ORDER BY id'
   ).all<{ id: number; name: string; wallet: string }>();
 
-  const schedules = (
-    await Promise.all(
+  const [schedulesRaw, oracle] = await Promise.all([
+    Promise.all(
       results.map(async (e): Promise<EmployeeVesting | null> => {
         try {
           const s = await readVaultSchedule(env, e.wallet);
@@ -45,8 +45,10 @@ vestingApp.get('/vesting', async (c) => {
           return null;
         }
       })
-    )
-  ).filter(Boolean) as EmployeeVesting[];
+    ),
+    readOraclePrice(env),
+  ]);
+  const schedules = schedulesRaw.filter(Boolean) as EmployeeVesting[];
 
-  return c.json({ vault: vaultMeta, releaser: env.TREASURY_WALLET_ADDRESS ?? null, schedules });
+  return c.json({ vault: vaultMeta, oracle, releaser: env.TREASURY_WALLET_ADDRESS ?? null, schedules });
 });
