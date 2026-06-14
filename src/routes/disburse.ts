@@ -80,7 +80,7 @@ export async function executeRun(env: Env, runId: number): Promise<{
           name: employee.name,
           amount_micro: employee.salary_micro,
           status: 'failed',
-          error: String(body.error ?? `seal -> ${res.status}`),
+          error: String(body.error ?? `seal -> ${res.status}`) + (body.reason ? `: ${body.reason}` : ''),
         });
         continue;
       }

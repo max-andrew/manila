@@ -436,7 +436,12 @@ export async function runAgent(env: Env, instruction: string): Promise<AgentOutc
   let repeated = false;
 
   for (let i = 0; i < 5 && !repeated; i++) {
-    const resp: any = await aiRun(env, model, { messages, tools: TOOLS });
+    let resp: any;
+    try {
+      resp = await aiRun(env, model, { messages, tools: TOOLS });
+    } catch {
+      break; // Workers AI unreachable/rate-limited — fall through to the deterministic parser
+    }
     const toolCalls: any[] = resp?.tool_calls ?? [];
 
     if (!toolCalls.length) break; // model produced no action — fall through to the deterministic parse
@@ -487,7 +492,7 @@ export async function runAgent(env: Env, instruction: string): Promise<AgentOutc
 
   // A vesting release is terminal — reply from its on-chain outcome.
   if (vesting) {
-    return { reply: vestingReply(vesting), run_id: null, tools_called: toolsCalled, run: vesting };
+    return { reply: sentenceCase(vestingReply(vesting)), run_id: null, tools_called: toolsCalled, run: vesting };
   }
 
   // Deterministic gate: finish whatever was drafted along the correct branch.
@@ -497,7 +502,7 @@ export async function runAgent(env: Env, instruction: string): Promise<AgentOutc
     if (run) reply = deterministicReply(run);
   }
   if (!reply) reply = 'I can run payroll or pay a specific address. Try “run today’s payroll”, “…with a 25% bonus”, or “send today’s pay to 0x…”.';
-  return { reply, run_id: lastRunId, tools_called: toolsCalled, run };
+  return { reply: sentenceCase(reply), run_id: lastRunId, tools_called: toolsCalled, run };
 }
 
 // Last-resort intent parser for when the model fails to emit a tool call.
@@ -584,6 +589,12 @@ async function finalizeRun(env: Env, runId: number): Promise<Record<string, unkn
     run.employee_names = results.map((r) => r.name);
   }
   return run;
+}
+
+// Capitalize the first letter of every sentence (policy reasons arrive in
+// lowercase, so "Refused. recipient 0x…" reads as "Refused. Recipient 0x…").
+function sentenceCase(s: string): string {
+  return s.replace(/(^\s*|[.!?]\s+)([a-z])/g, (_m, pre, ch) => pre + ch.toUpperCase());
 }
 
 function vestingReply(v: ToolResult): string {
