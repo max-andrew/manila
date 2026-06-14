@@ -25,15 +25,18 @@ const v = Object.fromEntries(
 );
 const opsKey = JSON.parse(readFileSync(join(here, '.gateway-ops.json'), 'utf8')).key;
 
-const VAULT = '0x2f217B2A62826F247084B207106233E5F67c60Ac';
+const VAULT = '0xb18B2D0119Afde4868889cf42Eb8d272f1Fd90FC'; // PayrollVaultV2
 const USDC = '0x3600000000000000000000000000000000000000';
 const RELEASER = v.TREASURY_WALLET_ADDRESS;
 
+// Defaults: a slow, long-horizon vest (equity-style) — 2 USDC over a year,
+// started 60 days ago with the cliff 30 days past. Never fully vests during a
+// demo; the agent's resetClock keeps a slice releasable. Override via args.
 const beneficiary = process.argv[2] ?? '0x1111111111111111111111111111111111111111';
-const totalUsd = Number(process.argv[3] ?? 5);
-const duration = BigInt(process.argv[4] ?? 6 * 3600);
-const cliffAgo = BigInt(process.argv[5] ?? 15 * 60);
-const startAgo = BigInt(process.argv[6] ?? 30 * 60);
+const totalUsd = Number(process.argv[3] ?? 2);
+const duration = BigInt(process.argv[4] ?? 365 * 24 * 3600);
+const cliffAgo = BigInt(process.argv[5] ?? 30 * 24 * 3600);
+const startAgo = BigInt(process.argv[6] ?? 60 * 24 * 3600);
 const total = BigInt(Math.round(totalUsd * 1e6)); // USDC ERC-20 is 6 decimals
 
 const arc = defineChain({ id: 5042002, name: 'Arc Testnet', nativeCurrency: { name: 'USDC', symbol: 'USDC', decimals: 18 }, rpcUrls: { default: { http: ['https://rpc.testnet.arc.network'] } } });
