@@ -1,6 +1,6 @@
 // Vesting — the on-chain, publicly verifiable disbursement path. Reads the
-// deployed PayrollVault for any employee on a vesting plan, and lets the agent
-// release vested USDC (signed by the Dynamic releaser in the sidecar).
+// deployed PayrollVaultV3 for any employee with an RSU grant, and lets the agent
+// release vested equity (settled in USDC, signed by the Dynamic releaser).
 
 import { Hono } from 'hono';
 import { readVaultSchedule, resetVestingClock, releaseVesting, readOraclePrice, vaultMeta, type VestingSchedule } from '../lib/vault';

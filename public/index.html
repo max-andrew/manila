@@ -389,7 +389,6 @@ const esc = (s) => String(s ?? '').replace(/[&<>]/g, c => ({ '&': '&amp;', '<': 
 const el = (id) => document.getElementById(id);
 const ARCSCAN = 'https://testnet.arcscan.app';
 const EXPLORER = ARCSCAN + '/tx/';
-const VAULT_ADDRESS = '0x2f217B2A62826F247084B207106233E5F67c60Ac';
 const short = (h) => h ? h.slice(0, 6) + '…' + h.slice(-4) : '';
 let manageMode = false;
 

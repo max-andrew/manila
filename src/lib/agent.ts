@@ -31,7 +31,7 @@ To run payroll (e.g. "run today's payroll", optionally "with a 10% bonus"):
 To pay specific team members BY NAME ("pay Ben Strauss", "pay just Ada and Carmen"), use draft_payroll_run with "only" set to their names — NOT draft_payment_to.
 Use draft_payment_to ONLY for an explicit 0x… address (e.g. "send today's pay to 0x…"), never for a person's name. Recipients not on the payroll allowlist are rejected.
 
-Some team members are on an on-chain vesting plan (an equity-style cliff held in the PayrollVault on Arc). To release their vested USDC early ("release Ada's vested pay", "early vest for Ada"), call release_vesting with their name. This settles a real on-chain transfer, signed by the Dynamic server wallet.
+Some team members have an on-chain RSU grant vesting in the equity vault on Arc. To release a team member's vested equity ("release Ada's vested equity", "release Ada's vested pay", "early vest for Ada"), call release_vesting with their name. It settles the vested shares' value in USDC, signed by the Dynamic server wallet.
 
 Call one tool at a time and wait for its result. Reply in one or two terse lowercase sentences, no exclamation points. Money is "sealed", never "sent" or "private".`;
 
@@ -106,11 +106,11 @@ const TOOLS = [
   {
     name: 'release_vesting',
     description:
-      "Release a team member's vested USDC from the on-chain PayrollVault (their equity-style cliff). Settles a real transfer on Arc, signed by the Dynamic server wallet. Use for 'release Ada's vested pay' / 'early vest for Ada'.",
+      "Release a team member's vested equity (RSU shares) from the on-chain vault — settles their value in USDC on Arc, signed by the Dynamic server wallet. Use for 'release Ada's vested equity' / 'release Ada's vested pay'.",
     parameters: {
       type: 'object',
       properties: {
-        name: { type: 'string', description: 'The team member whose vested USDC to release.' },
+        name: { type: 'string', description: 'The team member whose vested equity to release.' },
       },
       required: ['name'],
     },
@@ -348,7 +348,7 @@ async function rejectRun(env: Env, runId: number, reason: string): Promise<void>
   await audit(env.DB, { actor: 'agent', action: 'policy_rejected', run_id: runId, detail: { reason }, policy_result: 'blocked' });
 }
 
-// Release vested USDC from the on-chain vault for a named team member. This is
+// Release a named team member's vested equity (settled in USDC) from the vault. This is
 // a terminal action (no draft/policy branch) — it settles immediately on Arc.
 async function releaseVestingTool(env: Env, args: ToolResult): Promise<ToolResult> {
   const query = String(args.name ?? args.beneficiary ?? '').trim();
