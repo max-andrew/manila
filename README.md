@@ -31,7 +31,7 @@ The demo runs the agent **manually** — you tell it to run today's payroll. But
 - A **Cloudflare Cron Trigger** (`triggers.crons` in `wrangler.jsonc`, a `scheduled()` handler) fires the agent every morning — the Worker drafts the day's run, checks policy, and seals it, with no human in the loop.
 - For many employers, a **per-tenant Durable Object alarm** schedules each company's run independently and keeps its own state (last run, pending approvals), scaling to thousands of payrolls without external infra.
 
-This is only safe to leave unattended *because* the controls are deterministic: an unattended daily run either settles within policy or surfaces for a second signature, and no schedule or instruction can drain the treasury or redirect funds. So an employer can genuinely hand payroll to the agent — or keep it manual and click once a day. (Automation is intentionally left off in the demo so judges drive it themselves; flipping it on is a cron line, not a rebuild.)
+This is only safe to leave unattended *because* the controls are deterministic: an unattended daily run either settles within policy or surfaces for a second signature, and no schedule or instruction can drain the treasury or redirect funds. So an employer can genuinely hand payroll to the agent — or keep it manual and click once a day. (Automation is intentionally left off in the demo so it's driven interactively; flipping it on is a cron line, not a rebuild.)
 
 ## How we use each sponsor
 

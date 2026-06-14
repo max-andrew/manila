@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Judge mode: make the DEPLOYED site able to seal real payments.
+# Live signer: connect the local Dynamic MPC sidecar to the deployed app so it
+# can sign on-chain — sealing salaries and releasing equity.
 #
 # The Dynamic MPC signer runs locally (native binary, can't run on Workers).
 # This brings up the sidecar + a Cloudflare quick tunnel and points the
@@ -7,8 +8,8 @@
 # the shared secret (anyone hitting the tunnel without it gets 401), and a
 # quick tunnel needs no Cloudflare login — no credentials are exposed.
 #
-# Run during judging; Ctrl+C to stop (the site falls back to read-only +
-# the approval demo, which need no sidecar). Usage: bash scripts/judge-mode.sh
+# Run it while you want live on-chain signing; Ctrl+C to stop (the app falls
+# back to read-only, which needs no sidecar). Usage: bash scripts/live-signer.sh
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -45,6 +46,6 @@ sleep 4
 curl -s "$WORKER_URL/api/status" | python3 -c "import sys,json;d=json.load(sys.stdin);print('status: m1_ready=%s sidecar_reachable=%s' % (d['m1_ready'], d['sidecar'].get('reachable')))" || true
 
 echo
-echo "JUDGE MODE LIVE — $WORKER_URL can now seal real payments on Arc."
-echo "Keep this terminal open during judging. Ctrl+C to stop."
+echo "Live signer up — $WORKER_URL can now sign on Arc (seal salaries, release equity)."
+echo "Keep this terminal open while you need live signing. Ctrl+C to stop."
 wait $TUNNEL_PID
