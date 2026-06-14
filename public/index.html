@@ -149,6 +149,23 @@
   .vest-release-btn { margin-top: .35rem; font-family: var(--mono); font-size: .66rem; letter-spacing: .03em; color: var(--paper); background: var(--ink); border: none; border-radius: 6px; padding: .3rem .6rem; cursor: pointer; }
   .vest-release-btn:hover { background: #000; }
   .vest-release-btn:disabled { opacity: .5; cursor: default; }
+  .vest-status { font-size: .74rem; color: var(--khaki); margin-top: .7rem; min-height: 0; }
+  .vest-status:empty { display: none; }
+  .vest-status.ok { color: #3f6f47; }
+  .vest-status.err { color: var(--stamp); }
+  .vest-status a { color: inherit; }
+  /* Dynamic signer card */
+  #signer-body { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem 1.4rem; }
+  .signer-addr { font-family: var(--mono); font-size: 1.05rem; color: var(--ink); text-decoration: none; }
+  .signer-addr:hover { text-decoration: underline; }
+  .signer-desc { font-size: .74rem; color: var(--khaki); flex-basis: 100%; line-height: 1.5; margin-top: .1rem; }
+  .signer-switch { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; flex-basis: 100%; margin-top: .7rem; padding-top: .7rem; border-top: 1px solid var(--line); }
+  .signer-switch .eyebrow { flex-basis: 100%; }
+  .wallet-pill { font-family: var(--mono); font-size: .68rem; color: var(--khaki); border: 1px solid var(--line); border-radius: 999px; padding: .25rem .6rem; background: none; cursor: pointer; }
+  .wallet-pill:hover { color: var(--ink); border-color: var(--khaki); }
+  .wallet-pill.active { color: var(--ink); border-color: var(--manila); background: #fbf5e9; cursor: default; }
+  .wallet-pill.provision { border-style: dashed; }
+  .badge.off { color: var(--stamp); border-color: #e7c9c4; background: #fbeeec; }
 
   /* team roster */
   table { width: 100%; border-collapse: collapse; font-size: .82rem; }
@@ -249,7 +266,7 @@
   <section class="hero">
     <div>
       <h1>Confidential USDC payroll, paid daily by an agent.</h1>
-      <p>Under <b>1% of payroll</b> runs on stablecoins — a public chain turns every salary into a permanent public record. Manila seals it back up and pays the team <b>every day</b>: gas-free nanopayments make per-day payroll cost a fraction of a cent — impractical on ACH or wire. An agent runs it from plain English, under policy controls no instruction can talk past.</p>
+      <p>Under <b>1% of payroll</b> runs on stablecoins — a public chain turns every salary into a permanent public record. Manila seals it back up and pays the team <b>every day</b>: gas-free nanopayments make per-day payroll cost a fraction of a cent — impractical on ACH or wire. An agent runs it from plain English, under policy controls no instruction can talk past. Longer-horizon pay <b>vests on-chain</b> too — an equity-style cliff held in a USDC vault the agent releases as it accrues, publicly verifiable on Arc.</p>
     </div>
     <figure>
       <img src="/assets/manila_public_vs_sealed_comparison.png" alt="The same three salaries: fully public on a normal chain, sealed on Manila with an employer-only audit export.">
@@ -264,15 +281,20 @@
       <div id="chat-log"><div class="placeholder">Tell the agent to run today's payroll. It drafts the run, checks policy, and seals it — or holds for approval, or refuses.</div></div>
       <div class="chips" id="chips">
         <span class="chip" data-msg="Run today's payroll">Run today's payroll</span>
-        <span class="chip" data-msg="Run today's payroll with a 25% bonus">+25% bonus → approval</span>
-        <span class="chip" data-msg="Send today's pay to 0x000000000000000000000000000000000000dEaD">Pay a random wallet → blocked</span>
-        <span class="chip" data-msg="Run today's payroll with a 400% bonus">+400% → blocked</span>
+        <span class="chip" data-msg="Pay Ben Strauss">Pay Ben Strauss</span>
+        <span class="chip" data-msg="Run today's payroll with the maximally acceptable bonus">Run with the maximally acceptable bonus</span>
+        <span class="chip" data-msg="Send today's pay to 0x000000000000000000000000000000000000dEaD">Pay a random wallet</span>
       </div>
       <form id="chat-form" autocomplete="off">
         <input id="chat-input" type="text" placeholder="Run today's payroll" />
         <button type="submit" id="chat-send">Send</button>
       </form>
       <p class="agent-foot">Each payment is signed by a <b>Dynamic</b> server wallet — the agent holds no keys. Run on demand, or automate daily with a <b>Cloudflare Cron Trigger</b>.</p>
+    </section>
+
+    <section class="card" id="signer">
+      <h2>Dynamic server wallet <span class="badge" id="signer-badge"></span></h2>
+      <div id="signer-body"></div>
     </section>
 
     <section class="card" id="policy">
@@ -308,6 +330,7 @@
       <h2>Vesting — programmable USDC on Arc <span class="badge" id="vesting-badge"></span></h2>
       <p class="vesting-intro">An equity-style cliff held on-chain in the <b>PayrollVault</b>. Unlike sealed salary, vault funds are <b>publicly verifiable</b> — USDC sits locked in the contract and visibly transfers out as it vests. The <b>agent</b> releases it, signed by the <b>Dynamic</b> wallet (the vault's authorized releaser); the employer funds it up front.</p>
       <div id="vesting-body"></div>
+      <div id="vesting-status" class="vest-status"></div>
       <div id="vesting-links" class="explorer-links"></div>
     </section>
 
@@ -385,6 +408,50 @@ function renderRoster(employees, balances = {}) {
   }
 }
 
+let signerOnline = false;
+function renderSigner(s) {
+  signerOnline = !!(s && s.online);
+  const badge = el('signer-badge');
+  const body = el('signer-body');
+  const active = (s && (s.active || s.configured)) || null;
+  if (!s || !s.online) {
+    badge.textContent = 'offline'; badge.className = 'badge off';
+    body.innerHTML = active
+      ? `<a class="signer-addr" href="${ARCSCAN}/address/${active}" target="_blank" rel="noopener">${short(active)}&nbsp;↗</a>
+         <span class="signer-desc">MPC 2-of-2 server wallet — signs every payment and vault release; the agent holds no keys. Signer is offline now; start <b>judge-mode</b> to sign live.</span>`
+      : '<span class="signer-desc">Signer offline — start judge-mode.</span>';
+    return;
+  }
+  badge.textContent = 'online · MPC 2-of-2'; badge.className = 'badge';
+  const wallets = s.wallets || [];
+  const pills = wallets.map(w =>
+    w.active
+      ? `<span class="wallet-pill active" title="active signer">${short(w.address)} ✓</span>`
+      : `<button class="wallet-pill" data-addr="${w.address}" title="switch the active signer to this wallet">${short(w.address)}</button>`
+  ).join('');
+  body.innerHTML = `
+    <a class="signer-addr" href="${ARCSCAN}/address/${active}" target="_blank" rel="noopener" title="${active}">${short(active)}&nbsp;↗</a>
+    <span class="signer-desc">Dynamic MPC <b>2-of-2</b> server wallet — signs every payment and vault release; the agent holds no keys. Switching the signer changes who signs; only a wallet funded in Gateway and set as the vault releaser can settle — that's the security boundary.</span>
+    <div class="signer-switch">
+      <span class="eyebrow">Switch signer</span>
+      ${pills}
+      <button class="wallet-pill provision" id="signer-provision" title="provision a fresh Dynamic MPC wallet">+ new wallet</button>
+    </div>`;
+  body.querySelectorAll('.wallet-pill[data-addr]').forEach(b => b.onclick = () => switchSigner(b.dataset.addr, b));
+  const prov = el('signer-provision');
+  if (prov) prov.onclick = () => provisionSigner(prov);
+}
+async function switchSigner(address, btn) {
+  btn.disabled = true; btn.textContent = 'switching…';
+  try { await fetch('/api/signer/select', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ address }) }); } catch {}
+  await load();
+}
+async function provisionSigner(btn) {
+  btn.disabled = true; btn.textContent = 'creating…';
+  try { await fetch('/api/signer/provision', { method: 'POST' }); } catch {}
+  await load();
+}
+
 function renderVesting(v) {
   const card = el('vesting');
   if (!v || !v.vault) { card.hidden = true; return; }
@@ -412,17 +479,44 @@ function renderVesting(v) {
       </div>
       <div class="vest-act">
         <div class="vest-amt">$${s.releasable_usd}<span class="sub">releasable</span></div>
-        <button class="vest-release-btn" data-name="${esc(s.name)}">Release ↗</button>
+        <button class="vest-release-btn" data-name="${esc(s.name)}"${signerOnline ? '' : ' disabled title="Dynamic signer offline — start judge-mode to release"'}>Release ↗</button>
       </div>
     </div>`).join('');
   el('vesting-body').querySelectorAll('.vest-release-btn').forEach(b =>
-    b.onclick = () => sendMessage(`Release ${b.dataset.name}'s vested pay`)
+    b.onclick = () => releaseVested(b.dataset.name, b)
   );
+}
+
+// Release a beneficiary's vested USDC via the agent, with feedback right on the
+// card (the chat log is far above — routing only there felt like a no-op).
+async function releaseVested(name, btn) {
+  const status = el('vesting-status');
+  btn.disabled = true; btn.textContent = 'releasing…';
+  status.className = 'vest-status'; status.textContent = `Releasing ${name}'s vested USDC — signed by the Dynamic wallet…`;
+  try {
+    const res = await fetch('/api/agent', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ message: `Release ${name}'s vested pay` }) });
+    const data = await res.json();
+    addMsg('You', `Release ${name}'s vested pay`);
+    addMsg('Agent', data.reply || data.error || 'No response.');
+    const tx = data.run && data.run.explorer_url;
+    if (data.run && data.run.released) {
+      status.className = 'vest-status ok';
+      status.innerHTML = `Released ${esc(data.run.amount_usd ? '$' + data.run.amount_usd : '')} to ${esc(name)} on-chain${tx ? ` · <a href="${tx}" target="_blank" rel="noopener">view tx&nbsp;↗</a>` : ''}.`;
+    } else {
+      status.className = 'vest-status err';
+      status.textContent = data.reply || 'Release did not complete — the Dynamic signer may be offline (start judge-mode).';
+    }
+  } catch (err) {
+    status.className = 'vest-status err';
+    status.textContent = 'Release failed: ' + err.message;
+  }
+  btn.disabled = false; btn.textContent = 'Release ↗';
+  await load();
 }
 
 async function load() {
   try {
-    const [health, employees, audit, treasury, policy, balances, vesting] = await Promise.all([
+    const [health, employees, audit, treasury, policy, balances, vesting, signer] = await Promise.all([
       fetch('/api/health').then(r => r.json()),
       fetch('/api/employees').then(r => r.json()),
       fetch('/api/audit').then(r => r.json()),
@@ -430,8 +524,10 @@ async function load() {
       fetch('/api/policy').then(r => r.json()).catch(() => null),
       fetch('/api/team-balances').then(r => r.json()).catch(() => ({})),
       fetch('/api/vesting').then(r => r.json()).catch(() => null),
+      fetch('/api/signer').then(r => r.json()).catch(() => null),
     ]);
     setStatus(health.ok ? 'Arc testnet · live' : 'degraded', health.ok ? 'live' : 'err');
+    renderSigner(signer);
     renderPolicy(policy);
 
     if (treasury?.sealed?.available) {
@@ -625,7 +721,7 @@ el('ae-add').addEventListener('click', addEmployee);
 el('policy-edit').addEventListener('click', () => { policyEdit = !policyEdit; load(); });
 
 el('reset-demo').addEventListener('click', async () => {
-  if (!confirm("Reset the demo? Clears today's payroll runs, payments, and the audit log. The team and controls stay. (On-chain balances are real and remain.)")) return;
+  if (!confirm("Reset the demo? Re-opens today's payroll so the agent will run it again, without deleting any history — the audit trail and on-chain balances stay intact.")) return;
   const btn = el('reset-demo'); btn.disabled = true; btn.textContent = '…';
   try { await fetch('/api/reset', { method: 'POST' }); } catch {}
   el('chat-log').innerHTML = '<div class="placeholder">Tell the agent to run today\'s payroll. It drafts the run, checks policy, and seals it — or holds for approval, or refuses.</div>';
