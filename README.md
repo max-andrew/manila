@@ -6,7 +6,7 @@ For a century, salaries were private because they came in a sealed manila envelo
 
 > Built solo at ETHGlobal New York 2026.
 
-**Live:** [manila.maxwell-andrew.workers.dev](https://manila.maxwell-andrew.workers.dev) — the agent, policy engine, maker-checker approval, live treasury balance, and audit export run on the deployed URL. The full on-chain disbursement path (Dynamic-signed, Gateway-batched, Unlink-sealed) runs locally against the signing sidecar; see [Run it](#run-it).
+**Live:** [manila.maxwellandrew.com](https://manila.maxwellandrew.com) — the agent, policy engine, maker-checker approval, live treasury balance, and audit export run on the deployed URL. The full on-chain disbursement path (Dynamic-signed, Gateway-batched, Unlink-sealed) runs locally against the signing sidecar; see [Run it](#run-it).
 
 A real agent-driven payroll run has settled on Arc testnet — three salaries sealed as private Unlink transfers, e.g. tx [`0x1e76d25d…b15f4c`](https://testnet.arcscan.app/tx/0x1e76d25d2ceb8900649b1b30fe7e8bb99ca7dc6b20e840707501a905c5b15f4c) (amount and counterparty unreadable on the explorer — that's the point).
 
