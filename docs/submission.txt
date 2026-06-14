@@ -1,8 +1,7 @@
 MANILA — prize submission answers
 Live: https://manila.maxwell-andrew.workers.dev   Repo: https://github.com/max-andrew/manila
 
-Per sponsor: the prizes we're applying for and why, the clearest line of code
-where the tech is used, API ease of use (1-10), and feedback.
+Per sponsor: the prizes we're applying for and why, the clearest line of code where the tech is used, API ease of use (1-10), and feedback.
 
 
 ====================================================================
@@ -10,39 +9,21 @@ DYNAMIC
 ====================================================================
 
 PRIZES & WHY APPLICABLE
-- Best Agentic Build — The AI agent decides AND executes payroll on-chain,
-  signing every settlement authorization and every equity-vault release with a
-  Dynamic MPC server wallet. It holds no key material, and a deterministic policy
-  gate bounds what it can sign — autonomy with a hard signing boundary.
-- Best Money App — A deployed, real money-movement product: confidential USDC
-  payroll plus oracle-priced equity vesting, with maker-checker controls and an
-  exportable audit trail, built entirely on the Dynamic server-wallet SDK.
-- Best Private Nanopayments (joint, Dynamic x Unlink x Arc) — Dynamic is the
-  wallet layer: it creates the server wallet and signs every private nanopayment
-  authorization that Gateway then batches and Unlink seals.
+- Best Agentic Build — The AI agent decides AND executes payroll on-chain, signing every settlement authorization and every equity-vault release with a Dynamic MPC server wallet. It holds no key material, and a deterministic policy gate bounds what it can sign — autonomy with a hard signing boundary.
+- Best Money App — A deployed, real money-movement product: confidential USDC payroll plus oracle-priced equity vesting, with maker-checker controls and an exportable audit trail, built entirely on the Dynamic server-wallet SDK.
+- Best Private Nanopayments (joint, Dynamic x Unlink x Arc) — Dynamic is the wallet layer: it creates the server wallet and signs every private nanopayment authorization that Gateway then batches and Unlink seals.
 
 CODE LINK (clearest example)
-The server wallet signs each transaction the agent broadcasts (the agent never
-holds a key):
-https://github.com/max-andrew/manila/blob/main/sidecar/server.mjs#L136
-Stateless MPC wallet creation, backed up to Dynamic:
-https://github.com/max-andrew/manila/blob/main/sidecar/server.mjs#L80
+The server wallet signs each transaction the agent broadcasts (the agent never holds a key): https://github.com/max-andrew/manila/blob/main/sidecar/server.mjs#L136
+Stateless MPC wallet creation, backed up to Dynamic: https://github.com/max-andrew/manila/blob/main/sidecar/server.mjs#L80
 
 API EASE OF USE: 7/10
-Clean api-token + environment-id flow, and signTypedData accepting arbitrary
-EIP-712 is what let one wallet sign Circle's x402 batch authorizations — that
-composability is why the project works. Docked for the native-binary runtime
-constraint (below).
+Clean api-token + environment-id flow, and signTypedData accepting arbitrary EIP-712 is what let one wallet sign Circle's x402 batch authorizations — that composability is why the project works. Docked for the native-binary runtime constraint (below).
 
 FEEDBACK
-- @dynamic-labs-wallet/node-evm ships a native .node MPC binary, so it can't load
-  in Cloudflare Workers (or any edge/V8-isolate runtime). We confirmed by probing
-  workerd, then ran a Node sidecar just for signing. A "runtime: Node only, native
-  binary" note near the top of the server-wallet docs would save an hour.
-- A transitive dep (tslib, via @zerodev/ecdsa-validator) wasn't hoisted, so the
-  sidecar crashed first run with "Cannot find module 'tslib'".
-- getWallets() logs a deprecation warning pointing to getWalletByAddress(), but
-  the wallet-recovery example still uses getWallets().
+- @dynamic-labs-wallet/node-evm ships a native .node MPC binary, so it can't load in Cloudflare Workers (or any edge/V8-isolate runtime). We confirmed by probing workerd, then ran a Node sidecar just for signing. A "runtime: Node only, native binary" note near the top of the server-wallet docs would save an hour.
+- A transitive dep (tslib, via @zerodev/ecdsa-validator) wasn't hoisted, so the sidecar crashed first run with "Cannot find module 'tslib'".
+- getWallets() logs a deprecation warning pointing to getWalletByAddress(), but the wallet-recovery example still uses getWallets().
 
 
 ====================================================================
@@ -50,34 +31,19 @@ UNLINK
 ====================================================================
 
 PRIZES & WHY APPLICABLE
-- Best Private Nanopayments (joint, Dynamic x Unlink x Arc) — Every salary is
-  sealed as a private Unlink transfer between unlink1 accounts, hiding amount,
-  sender, recipient, and token on the public explorer (only an opaque privacy-pool
-  interaction shows). Private payroll is the product's whole reason to exist;
-  remove Unlink and salaries are public.
+- Best Private Nanopayments (joint, Dynamic x Unlink x Arc) — Every salary is sealed as a private Unlink transfer between unlink1 accounts, hiding amount, sender, recipient, and token on the public explorer (only an opaque privacy-pool interaction shows). Private payroll is the product's whole reason to exist; remove Unlink and salaries are public.
 
 CODE LINK (clearest example)
-One sealed salary transfer:
-https://github.com/max-andrew/manila/blob/main/src/lib/unlink.ts#L71
-Offline private-account provisioning for a new hire:
-https://github.com/max-andrew/manila/blob/main/src/lib/unlink.ts#L39
+One sealed salary transfer: https://github.com/max-andrew/manila/blob/main/src/lib/unlink.ts#L71
+Offline private-account provisioning for a new hire: https://github.com/max-andrew/manila/blob/main/src/lib/unlink.ts#L39
 
 API EASE OF USE: 6/10
-The core is clean — offline account derivation needs no key or network, and
-transfer() returning { txId, status, txHash } is exactly right. Docked mostly for
-testnet token/faucet discovery friction (below).
+The core is clean — offline account derivation needs no key or network, and transfer() returning { txId, status, txHash } is exactly right. Docked mostly for testnet token/faucet discovery friction (below).
 
 FEEDBACK
-- The faucet token was the biggest time sink: on arc-testnet the pool settles
-  mock tokens (ULNKm/USDCm), not native USDC — but passing the native USDC address
-  returns only "invalid token: token not supported by faucet" with no hint of what
-  IS supported, and env-info exposes no token list. A supported-token list in
-  env-info (or the error) would fix this instantly.
-- USDCm is 18 decimals, not 6 like real USDC — surprising for a USD stand-in and
-  easy to get silently wrong in amount math.
-- The /admin entry maps to null under the "browser" export condition, so
-  wrangler/esbuild fail with "Could not resolve @unlink-xyz/sdk/admin"; we added a
-  wrangler alias. A node/worker export condition would remove this.
+- The faucet token was the biggest time sink: on arc-testnet the pool settles mock tokens (ULNKm/USDCm), not native USDC — but passing the native USDC address returns only "invalid token: token not supported by faucet" with no hint of what IS supported, and env-info exposes no token list. A supported-token list in env-info (or the error) would fix this instantly.
+- USDCm is 18 decimals, not 6 like real USDC — surprising for a USD stand-in and easy to get silently wrong in amount math.
+- The /admin entry maps to null under the "browser" export condition, so wrangler/esbuild fail with "Could not resolve @unlink-xyz/sdk/admin"; we added a wrangler alias. A node/worker export condition would remove this.
 - The @canary install-tag requirement isn't obvious from the package page.
 
 
@@ -86,40 +52,20 @@ ARC / CIRCLE
 ====================================================================
 
 PRIZES & WHY APPLICABLE
-- Best Smart Contracts on Arc (Advanced Stablecoin Logic) — PayrollVaultV3 reads a
-  live company share price from an on-chain oracle and settles vested RSU shares in
-  USDC: multi-step settlement (oracle read -> share-to-USDC conversion -> transfer),
-  plus resetClock re-arming and topUp; 20 passing Foundry tests.
-- Best Agentic Economy with the Circle Agent Stack — The agent pays a per-
-  disbursement $0.001 x402 nanopayment netted by Circle Gateway into one gas-free
-  settlement on Arc — agent-to-service commerce, the whole run costing $0.003.
-- Best Private Nanopayments (joint, Dynamic x Unlink x Arc) — Circle Gateway
-  batches the nanopayments into one gas-free settlement and USDC is the settlement
-  and native gas asset throughout, on Arc as the high-throughput L1.
+- Best Smart Contracts on Arc (Advanced Stablecoin Logic) — PayrollVaultV3 reads a live company share price from an on-chain oracle and settles vested RSU shares in USDC: multi-step settlement (oracle read -> share-to-USDC conversion -> transfer), plus resetClock re-arming and topUp; 20 passing Foundry tests.
+- Best Agentic Economy with the Circle Agent Stack — The agent pays a per-disbursement $0.001 x402 nanopayment netted by Circle Gateway into one gas-free settlement on Arc — agent-to-service commerce, the whole run costing $0.003.
+- Best Private Nanopayments (joint, Dynamic x Unlink x Arc) — Circle Gateway batches the nanopayments into one gas-free settlement and USDC is the settlement and native gas asset throughout, on Arc as the high-throughput L1.
 
 CODE LINK (clearest example)
-Circle Gateway / x402 settlement of a disbursement:
-https://github.com/max-andrew/manila/blob/main/src/routes/seal.ts#L153
-The Dynamic wallet signing the batched Gateway authorization:
-https://github.com/max-andrew/manila/blob/main/src/routes/disburse.ts#L47
-Arc testnet chain (USDC as native gas):
-https://github.com/max-andrew/manila/blob/main/src/lib/arc.ts#L10
-The contract reading the oracle and converting shares -> USDC:
-https://github.com/max-andrew/manila/blob/main/contracts/src/PayrollVaultV3.sol#L129
+Circle Gateway / x402 settlement of a disbursement: https://github.com/max-andrew/manila/blob/main/src/routes/seal.ts#L153
+The Dynamic wallet signing the batched Gateway authorization: https://github.com/max-andrew/manila/blob/main/src/routes/disburse.ts#L47
+Arc testnet chain (USDC as native gas): https://github.com/max-andrew/manila/blob/main/src/lib/arc.ts#L10
+The contract reading the oracle and converting shares -> USDC: https://github.com/max-andrew/manila/blob/main/contracts/src/PayrollVaultV3.sol#L129
 
 API EASE OF USE: 8/10
-The x402 buyer needs no API key — just an EOA — which is excellent DX;
-getSupported() advertising each network's verifyingContract + assets made the seal
-endpoint self-configuring; depositFor() funded the MPC wallet's Gateway balance
-from a separate EOA cleanly; native USDC gas on Arc just worked.
+The x402 buyer needs no API key — just an EOA — which is excellent DX; getSupported() advertising each network's verifyingContract + assets made the seal endpoint self-configuring; depositFor() funded the MPC wallet's Gateway balance from a separate EOA cleanly; native USDC gas on Arc just worked.
 
 FEEDBACK
-- @circle-fin/x402-batching's seller side is Express-shaped ((req, res, next)
-  middleware). Porting to Hono on Workers meant reading source for the exact header
-  names (PAYMENT-REQUIRED / payment-signature / PAYMENT-RESPONSE) and the base64-
-  JSON envelope. A framework-agnostic core (verify/settle given a payload +
-  requirements) would make non-Express integrations much easier.
-- The USDC asset lives at kind.extra.assets[].address (find by symbol); easy to
-  read the wrong field without an example.
-- The Arc faucet's 20 USDC / 2h / address limit is tight when provisioning several
-  wallets for one demo.
+- @circle-fin/x402-batching's seller side is Express-shaped ((req, res, next) middleware). Porting to Hono on Workers meant reading source for the exact header names (PAYMENT-REQUIRED / payment-signature / PAYMENT-RESPONSE) and the base64-JSON envelope. A framework-agnostic core (verify/settle given a payload + requirements) would make non-Express integrations much easier.
+- The USDC asset lives at kind.extra.assets[].address (find by symbol); easy to read the wrong field without an example.
+- The Arc faucet's 20 USDC / 2h / address limit is tight when provisioning several wallets for one demo.
