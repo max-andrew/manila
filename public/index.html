@@ -155,7 +155,7 @@
   .vest-release-btn:hover { background: #000; }
   .vest-release-btn:disabled { opacity: .5; cursor: default; }
   .vest-reset-btn { font-family: var(--mono); font-size: .62rem; letter-spacing: .03em; color: var(--khaki); background: none; border: 1px solid var(--line); border-radius: 6px; padding: .26rem .55rem; cursor: pointer; }
-  .vest-reset-btn:hover { color: var(--ink); border-color: var(--khaki); }
+  .vest-reset-btn:hover { color: var(--ink); border-color: var(--khaki); background: #fbf5e9; }
   .vest-reset-btn:disabled { opacity: .45; cursor: default; }
   .vest-status { font-size: .74rem; color: var(--khaki); margin-top: .7rem; min-height: 0; }
   .vest-status:empty { display: none; }
@@ -428,29 +428,20 @@ function renderSigner(s) {
   const badge = el('signer-badge');
   const body = el('signer-body');
   const active = (s && (s.active || s.configured)) || null;
+  const desc =
+    'One Dynamic <b>MPC</b> server wallet — its private key is split into two shares (a <b>2-of-2 threshold</b>), so no single party (not us, not the agent) can ever sign alone. It signs every payment and vault release. One wallet, one address; the "2-of-2" is the key, not a second account.';
   if (!s || !s.online) {
     badge.textContent = 'reconnecting'; badge.className = 'badge off';
     body.innerHTML = active
       ? `<a class="signer-addr" href="${ARCSCAN}/address/${active}" target="_blank" rel="noopener">${short(active)}&nbsp;↗</a>
-         <span class="signer-desc">Dynamic MPC 2-of-2 server wallet — signs every payment and vault release; the agent holds no keys. Reconnecting to the signer; refresh in a moment.</span>`
+         <span class="signer-desc">${desc} Reconnecting to the signer; refresh in a moment.</span>`
       : '<span class="signer-desc">Reconnecting to the Dynamic signer…</span>';
     return;
   }
-  badge.textContent = 'online · MPC 2-of-2'; badge.className = 'badge';
-  const wallets = s.wallets || [];
-  const pills = wallets.map(w =>
-    w.active
-      ? `<span class="wallet-pill active" title="active signer">${short(w.address)} ✓ active</span>`
-      : `<a class="wallet-pill" href="${ARCSCAN}/address/${w.address}" target="_blank" rel="noopener" title="${w.address}">${short(w.address)}</a>`
-  ).join('');
+  badge.textContent = 'online'; badge.className = 'badge';
   body.innerHTML = `
     <a class="signer-addr" href="${ARCSCAN}/address/${active}" target="_blank" rel="noopener" title="${active}">${short(active)}&nbsp;↗</a>
-    <span class="signer-desc">Dynamic MPC <b>2-of-2</b> server wallet — signs every payment and vault release; the agent holds no keys. The signing set is a Dynamic team, not a hardcoded key.</span>
-    <div class="signer-switch">
-      <span class="eyebrow">Signing set</span>
-      ${pills}
-      <span class="signer-rotate">Rotating signers is a treasury operation — <a href="mailto:hello@manila.xyz?subject=Onboard%20Dynamic%20signing%20team">contact us</a> to onboard your Dynamic wallets as a new signing team.</span>
-    </div>`;
+    <span class="signer-desc">${desc} <a href="mailto:hello@manila.xyz?subject=Onboard%20Dynamic%20signing%20team">Contact us</a> to rotate it onto your own Dynamic signing team — it isn't a hardcoded key.</span>`;
 }
 
 // Poll the vesting state so releasable visibly ticks up (the schedule streams
