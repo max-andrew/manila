@@ -33,9 +33,15 @@ export async function executeRun(env: Env, runId: number): Promise<{
   fees_micro: number;
   message: string;
 }> {
-  const { results: employees } = await env.DB.prepare(
+  const { results: roster } = await env.DB.prepare(
     'SELECT id, name, salary_micro FROM employees ORDER BY id'
   ).all<{ id: number; name: string; salary_micro: number }>();
+  // A run may target a subset of the roster ("pay just Ben").
+  const runRow = await env.DB.prepare('SELECT employee_ids FROM payroll_runs WHERE id = ?')
+    .bind(runId)
+    .first<{ employee_ids: string | null }>();
+  const onlyIds: number[] | null = runRow?.employee_ids ? JSON.parse(runRow.employee_ids) : null;
+  const employees = onlyIds ? roster.filter((e) => onlyIds.includes(e.id)) : roster;
 
   const core = new x402Client();
   registerBatchScheme(core, {
