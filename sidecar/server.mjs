@@ -87,18 +87,8 @@ async function loadOrCreateWallet() {
   return created.walletMetadata;
 }
 
-// The active server wallet is mutable — the app can switch which Dynamic MPC
-// wallet signs, or provision a new one (see /wallets, /select-wallet,
-// /provision-wallet below).
-let walletMetadata = await loadOrCreateWallet();
-let address = walletMetadata.accountAddress;
-
-function setActiveWallet(meta) {
-  walletMetadata = meta;
-  address = meta.accountAddress;
-  writeFileSync(WALLET_FILE, JSON.stringify({ walletMetadata: meta }, null, 2));
-  console.log(`active wallet -> ${address}`);
-}
+const walletMetadata = await loadOrCreateWallet();
+const address = walletMetadata.accountAddress;
 
 // --- tx field coercion: JSON carries strings, viem wants bigints ----------
 const BIGINT_FIELDS = ['value', 'gas', 'gasPrice', 'maxFeePerGas', 'maxPriorityFeePerGas'];
@@ -153,29 +143,15 @@ const server = http.createServer(async (req, res) => {
       );
       return json(res, 200, { signature, address });
     }
-    // List the account's Dynamic MPC wallets and which one is active.
+    // Read-only: list the account's Dynamic MPC wallets and the active signer.
+    // Rotating the signing set is deliberately NOT exposed here — it's a
+    // treasury operation, so a misclick can't lock the infra out.
     if (req.url === '/wallets') {
       const wallets = await withReauth(() => client.getEvmWallets());
       return json(res, 200, {
         active: address,
         wallets: wallets.map((w) => ({ address: w.accountAddress, active: w.accountAddress === address })),
       });
-    }
-    // Switch the active signer to another of the account's wallets.
-    if (req.url === '/select-wallet') {
-      const target = String(payload.address ?? '').toLowerCase();
-      const wallets = await withReauth(() => client.getEvmWallets());
-      const found = wallets.find((w) => w.accountAddress.toLowerCase() === target);
-      if (!found) return json(res, 404, { error: 'wallet not found in this Dynamic account' });
-      setActiveWallet(found);
-      return json(res, 200, { active: address });
-    }
-    // Provision a fresh Dynamic MPC wallet (2-of-2) under the account.
-    if (req.url === '/provision-wallet') {
-      const created = await withReauth(() =>
-        client.createWalletAccount({ thresholdSignatureScheme: 'TWO_OF_TWO', password: WALLET_PASSWORD, backUpToDynamic: true })
-      );
-      return json(res, 200, { address: created.walletMetadata.accountAddress });
     }
     return json(res, 404, { error: 'not found' });
   } catch (err) {

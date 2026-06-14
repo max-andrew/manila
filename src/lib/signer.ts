@@ -58,22 +58,10 @@ export async function signTransaction(
   return signedTx;
 }
 
-// The address that actually signs right now. The sidecar is the source of
-// truth (its active wallet is switchable); fall back to the configured treasury
-// address when the sidecar is unreachable, so reads degrade gracefully.
-export async function activeSignerAddress(env: Env): Promise<`0x${string}`> {
-  try {
-    const { address } = await sidecarHealth(env);
-    if (address) return address as `0x${string}`;
-  } catch {
-    /* offline — use the configured address */
-  }
-  return env.TREASURY_WALLET_ADDRESS as `0x${string}`;
-}
-
 export type SignerWallet = { address: string; active: boolean };
 
-// Live signer status + the account's switchable Dynamic wallets.
+// Read-only signer status + the account's Dynamic wallets (the signing set).
+// Rotation is intentionally not exposed — see the signer card copy.
 export async function signerStatus(
   env: Env
 ): Promise<{ online: boolean; active: string | null; configured: string | null; wallets: SignerWallet[] }> {
@@ -84,12 +72,4 @@ export async function signerStatus(
   } catch {
     return { online: false, active: null, configured, wallets: [] };
   }
-}
-
-export async function selectSigner(env: Env, address: string): Promise<{ active: string }> {
-  return sidecar<{ active: string }>(env, '/select-wallet', { address });
-}
-
-export async function provisionSigner(env: Env): Promise<{ address: string }> {
-  return sidecar<{ address: string }>(env, '/provision-wallet', {});
 }
