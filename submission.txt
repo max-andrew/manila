@@ -1,0 +1,29 @@
+SHORT DESCRIPTION
+
+AI-agent payroll: confidential daily USDC salaries + programmable on-chain vesting, on Arc.
+
+
+DESCRIPTION
+
+Manila is confidential USDC payroll, operated by an AI agent. Today under 1% of payroll runs on stablecoins, partly because a public chain turns every salary into a permanent, public record. Manila fixes that and pays the team daily instead of monthly.
+
+You instruct an agent in plain English — "run today's payroll," "pay just Ben Strauss," "run with the maximally acceptable bonus." The agent drafts the run, but it can't act on vibes: every run is checked against a deterministic policy engine (per-run cap, hard ceiling, pay band, recipient allowlist) that returns one of three verdicts — pass, hold for a second human signature, or refuse. The model proposes; deterministic code disposes, so no clever prompt can talk a payment past the controls.
+
+Manila runs two USDC rails:
+
+1. Sealed daily salary — each salary is sent as a private transfer, settled through gas-free batched nanopayments, so per-day payroll costs a fraction of a cent (impractical on ACH or wire). Balances are sealed from the public explorer but remain auditable to the employer.
+
+2. Programmable equity — RSU grants vest on-chain (cliff + linear). On release, the smart contract reads a live company share price from an on-chain oracle and pays the vested shares' value in USDC — equity that tracks the real stock but settles in stablecoin. This path is fully public and verifiable on Arc; the agent releases each tranche, signed by the Dynamic wallet.
+
+Every action — drafts, policy checks, seals, vault releases — lands in an exportable audit trail. The agent holds no private keys: every payment is signed by a Dynamic MPC server wallet.
+
+
+HOW IT'S MADE
+
+The whole app is a Cloudflare Worker (Hono router, D1/SQLite for state, served from one static page). The agent brain is Cloudflare Workers AI running Llama 3.3 70B in a function-calling loop — no external LLM key, the model runs on the AI binding. The model only routes: it picks tools (draft run, check policy, execute, request approval, release vesting), and a deterministic policy engine makes every money decision, so a smaller free model can't be talked past the controls. A deterministic fallback parser handles cases where the model emits no clean tool call, so commands never fail or echo garbage.
+
+Circle / Arc: everything settles in USDC on Arc testnet, where USDC is the native gas token. Payroll fees settle as batched x402 nanopayments through Circle Gateway. The equity-vesting path is a Solidity contract (PayrollVaultV3, Foundry-tested, 20 tests) deployed on Arc for the "Advanced Stablecoin Logic" track: it vests RSU shares and, on release, reads a live AAPL/USD price from an on-chain oracle and pays the vested shares' value in USDC — multi-step settlement (oracle read → share-to-USDC conversion → transfer), plus resetClock (re-arm) and topUp. The oracle is the standard Pyth IPyth interface; on Arc we deploy a PythPriceRelay fed real prices from Pyth's free Hermes feed, so it's a drop-in for canonical Pyth.
+
+Unlink: salaries are sealed as private transfers via the Unlink SDK; the public explorer can't show them (the point), so we read employer-auditable balances through Unlink's admin API.
+
+Dynamic: the agent holds no keys. A Dynamic MPC (2-of-2) server wallet signs every x402 authorization and every on-chain vault release. Because the native MPC binary can't run inside workerd, the hacky-but-clean bit is a tiny Node sidecar that exposes signing only — the Worker builds the transaction, the sidecar signs, the Worker broadcasts. The Dynamic wallet is also the vault's on-chain releaser, so "the agent released vested USDC, signed by Dynamic, settled on Arc" is literally true on-chain.

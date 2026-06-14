@@ -31,9 +31,20 @@ flowchart LR
   Seal -->|sealed salary transfer| Unlink["Unlink private account
   amounts + counterparties hidden"]
   Unlink --> Employees
+  Agent -->|release vested RSUs| Vault["PayrollVaultV3 (Arc)
+  RSU vesting, USDC-settled"]
+  Oracle["Pyth price relay (Arc)
+  live AAPL/USD via Hermes"] -->|share price| Vault
+  Sidecar -->|signs release| Vault
+  Vault -->|USDC payout (publicly verifiable)| Employees
   Agent --> Audit["Audit log → CSV export"]
   Seal --> Audit
+  Vault --> Audit
 ```
+
+*Full diagrams (system + the oracle/RSU flow): [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).*
+
+Two disbursement rails, both agent-operated and Dynamic-signed. **Sealed daily salary** (the private path, above). **Programmable equity** — RSU grants vest on-chain in [`PayrollVaultV3`](contracts/README.md); on release the contract reads a live company share price from an on-chain Pyth-shaped oracle and pays the vested shares' value in USDC, so the grant tracks the real stock but settles in stablecoin — the publicly-verifiable counterpart to the sealed rail.
 
 Two legs per payroll run. The **value leg** is sealed: salaries move as Unlink private transfers — amounts and counterparties unreadable on ArcScan. The **nanopayment leg** is the meter: the agent pays a $0.001 x402 micropayment per disbursement to the seal service, each authorization signed by the Dynamic server wallet (the agent holds no keys), all of them netted by Circle Gateway into one batched, gas-free settlement on Arc. No payment, no seal: every sponsor integration is load-bearing.
 
@@ -56,9 +67,13 @@ Each integration is load-bearing — remove it and the product stops working, no
 - **Unlink** (joint Private Nanopayments) — every salary is sealed: each disbursement is an Unlink private transfer, so amounts and counterparties are unreadable on ArcScan (`src/lib/unlink.ts`, `src/routes/seal.ts`). This is the product's whole reason to exist; without it, payroll is public.
 - **Circle Gateway + Arc** (Best Agentic Economy, joint Private Nanopayments) — disbursements are metered as x402 nanopayments and netted by Circle Gateway into one batched, gas-free settlement on Arc testnet (`src/routes/seal.ts`, `src/routes/disburse.ts`). The agent paying per-call for each sealed disbursement is exactly the agent-to-service commerce pattern the Agentic Economy track is for.
 
-## Programmable vesting (Arc)
+## Programmable equity vesting (Arc — Advanced Stablecoin Logic)
 
-Beyond the sealed default path, an employee on a vesting plan can be paid through [`PayrollVault`](contracts/README.md) — a Solidity contract deployed on Arc with cliff + linear USDC vesting, funded once by the employer and `release()`d by the agent wallet as funds vest, each release a real USDC transfer logged to the same audit trail. Deployed at [`0x2f217B2A…60Ac`](https://testnet.arcscan.app/address/0x2f217B2A62826F247084B207106233E5F67c60Ac).
+The second rail is **equity that pays in cash**: [`PayrollVaultV3`](contracts/README.md) vests **RSU shares** (cliff + linear) and, on release, reads a **live company share price from an on-chain oracle** and pays the vested shares' value in **USDC** — so a grant tracks the real stock but settles in stablecoin. This is the Arc *Advanced Stablecoin Logic* track: multi-step settlement (oracle read → share→USDC conversion → transfer) plus `resetClock` re-arming and `topUp`, 20 passing Foundry tests.
+
+- **Oracle.** The vault reads the standard Pyth `IPyth` interface. On Arc we provide [`PythPriceRelay`](contracts/src/PythPriceRelay.sol) — fed the real **AAPL/USD** price from Pyth's free [Hermes](https://hermes.pyth.network) feed (`scripts/oracle-push.mjs`) — so it's a drop-in for canonical Pyth (an address swap, no code change). The release payout literally tracks Apple's share price; raise the oracle and the same vested shares pay more USDC.
+- **Agent-operated.** The Dynamic server wallet is the vault's `releaser`; the agent releases (and re-arms) tranches on command, signed in the sidecar — every release a real, publicly verifiable USDC transfer on Arc, logged to the same audit trail.
+- **Deployed:** vault [`0x021Bf03C…B06b`](https://testnet.arcscan.app/address/0x021Bf03C10ed7d8205aaD4dE6D3847D94715B06b), oracle relay [`0xb8e18484…3424`](https://testnet.arcscan.app/address/0xb8e18484bebC0356A67293590B8affE2b55e3424).
 
 ## Roadmap
 

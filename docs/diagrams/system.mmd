@@ -1,0 +1,40 @@
+flowchart TB
+  Employer(["Employer"]) -->|plain-English command| Agent
+
+  subgraph CF["Cloudflare Worker (Hono + D1)"]
+    Agent["AI agent — Workers AI<br/>Llama 3.3 70B, function calling"]
+    Policy["Deterministic policy engine<br/>cap · hard ceiling · pay band · allowlist"]
+    Agent --> Policy
+    Policy -->|review| Approval["Maker-checker<br/>2nd signature"]
+    Audit[("Audit log → CSV")]
+  end
+
+  Sidecar["Signing sidecar (Node)<br/><b>Dynamic</b> MPC 2-of-2 server wallet"]
+  Sidecar -. signs, agent holds no keys .-> Agent
+
+  subgraph Salary["Rail 1 — sealed daily salary (private)"]
+    Seal["Seal service<br/>x402-protected, per employee"]
+    Gateway["<b>Circle Gateway</b><br/>batched gas-free settlement"]
+    Unlink["<b>Unlink</b> private account<br/>amount + parties hidden"]
+    Seal -->|x402 nanopayment| Gateway
+    Seal -->|sealed transfer| Unlink
+  end
+
+  subgraph Equity["Rail 2 — programmable equity (public)"]
+    Vault["<b>PayrollVaultV3</b><br/>RSU vesting, USDC-settled"]
+    Oracle["<b>Pyth</b> price relay<br/>live AAPL/USD via Hermes"]
+    Oracle -->|share price| Vault
+  end
+
+  Policy -->|pass| Seal
+  Approval --> Seal
+  Agent -->|release / resetClock| Vault
+  Sidecar -. signs settlement .-> Seal
+  Sidecar -. signs release .-> Vault
+  Unlink --> Employees(["Employees"])
+  Vault -->|USDC payout| Employees
+  Seal --> Audit
+  Vault --> Audit
+
+  Salary -.-> Arc[["Arc testnet — USDC is native gas"]]
+  Equity -.-> Arc
