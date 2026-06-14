@@ -90,6 +90,17 @@ async function loadOrCreateWallet() {
 const walletMetadata = await loadOrCreateWallet();
 const address = walletMetadata.accountAddress;
 
+// The Dynamic MPC signer isn't safe to call concurrently (parallel signs corrupt
+// the session — "Error signing typed data"). Serialize all signing through a
+// promise chain so the Worker can fan out a payroll run's seals while the signs
+// themselves queue (they're the fast step; settlement + Unlink run in parallel).
+let signChain = Promise.resolve();
+function serializeSign(fn) {
+  const run = signChain.then(fn, fn);
+  signChain = run.then(() => {}, () => {});
+  return run;
+}
+
 // --- tx field coercion: JSON carries strings, viem wants bigints ----------
 const BIGINT_FIELDS = ['value', 'gas', 'gasPrice', 'maxFeePerGas', 'maxPriorityFeePerGas'];
 function coerceTx(tx) {
@@ -126,21 +137,21 @@ const server = http.createServer(async (req, res) => {
 
   try {
     if (req.url === '/sign-typed-data') {
-      const signature = await withReauth(() =>
+      const signature = await serializeSign(() => withReauth(() =>
         client.signTypedData({ walletMetadata, typedData: payload.typedData, password: WALLET_PASSWORD })
-      );
+      ));
       return json(res, 200, { signature, address });
     }
     if (req.url === '/sign-transaction') {
-      const signedTx = await withReauth(() =>
+      const signedTx = await serializeSign(() => withReauth(() =>
         client.signTransaction({ walletMetadata, transaction: coerceTx(payload.transaction), password: WALLET_PASSWORD })
-      );
+      ));
       return json(res, 200, { signedTx, address });
     }
     if (req.url === '/sign-message') {
-      const signature = await withReauth(() =>
+      const signature = await serializeSign(() => withReauth(() =>
         client.signMessage({ walletMetadata, message: payload.message, password: WALLET_PASSWORD })
-      );
+      ));
       return json(res, 200, { signature, address });
     }
     // Read-only: list the account's Dynamic MPC wallets and the active signer.

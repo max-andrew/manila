@@ -49,8 +49,9 @@ export async function executeRun(env: Env, runId: number): Promise<{
   });
   const http = new x402HTTPClient(core);
 
-  const payments: SealOutcome[] = [];
-  for (const employee of employees) {
+  // Each employee's seal is independent (its own x402 payment + Unlink transfer),
+  // so run them concurrently — a 3-employee run drops from ~3x one seal to ~1x.
+  const sealOne = async (employee: { id: number; name: string; salary_micro: number }): Promise<SealOutcome> => {
     const path = `/seal/${employee.id}`;
     const init = {
       method: 'POST',
@@ -75,33 +76,33 @@ export async function executeRun(env: Env, runId: number): Promise<{
       }
       const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
       if (!res.ok) {
-        payments.push({
+        return {
           employee_id: employee.id,
           name: employee.name,
           amount_micro: employee.salary_micro,
           status: 'failed',
           error: String(body.error ?? `seal -> ${res.status}`) + (body.reason ? `: ${body.reason}` : ''),
-        });
-        continue;
+        };
       }
-      payments.push({
+      return {
         employee_id: employee.id,
         name: employee.name,
         amount_micro: (body.amount_micro as number) ?? employee.salary_micro,
         status: 'sealed',
         unlink_ref: body.unlink_ref as string | undefined,
         gateway_ref: (body.gateway_ref as string | null) ?? undefined,
-      });
+      };
     } catch (err) {
-      payments.push({
+      return {
         employee_id: employee.id,
         name: employee.name,
         amount_micro: employee.salary_micro,
         status: 'failed',
         error: err instanceof Error ? err.message : String(err),
-      });
+      };
     }
-  }
+  };
+  const payments: SealOutcome[] = await Promise.all(employees.map(sealOne));
 
   const sealed = payments.filter((p) => p.status === 'sealed');
   const total = sealed.reduce((sum, p) => sum + p.amount_micro, 0);
