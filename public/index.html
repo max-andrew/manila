@@ -736,12 +736,17 @@ async function sendMessage(message) {
   const send = el('chat-send');
   send.disabled = true; send.textContent = '…';
   const thinking = addMsg('Agent', 'drafting…', 'think');
+  // The agent decides in ~2s; a run that passes then settles on-chain (sealing
+  // salaries or releasing equity) takes longer. Swap the status so the wait
+  // reads as intentional rather than hung.
+  const onchain = /\b(release|vest|vested|vesting|equity|early)\b/i.test(message) ? 'releasing on Arc…' : 'sealing on Arc…';
+  const phase = setTimeout(() => { if (thinking.isConnected) thinking.textContent = onchain; }, 2000);
   try {
     const res = await fetch('/api/agent', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ message }) });
     const data = await res.json();
-    thinking.remove();
+    clearTimeout(phase); thinking.remove();
     addMsg('Agent', data.reply || data.error || 'No response.');
-  } catch (err) { thinking.remove(); addMsg('Agent', 'Error: ' + err.message); }
+  } catch (err) { clearTimeout(phase); thinking.remove(); addMsg('Agent', 'Error: ' + err.message); }
   send.disabled = false; send.textContent = 'Send';
   await load();
 }
