@@ -28,7 +28,8 @@ To run payroll (e.g. "run today's payroll", optionally "with a 10% bonus"):
 2. Call check_policy with the run_id.
 3. If verdict is "pass", call execute_run. If "review", call request_approval — a human adds a second signature. If "rejected", stop — the run is refused.
 
-To pay a specific address (e.g. "send today's pay to 0x..."), call draft_payment_to, then check_policy. Recipients not on the payroll allowlist are rejected.
+To pay specific team members BY NAME ("pay Ben Strauss", "pay just Ada and Carmen"), use draft_payroll_run with "only" set to their names — NOT draft_payment_to.
+Use draft_payment_to ONLY for an explicit 0x… address (e.g. "send today's pay to 0x…"), never for a person's name. Recipients not on the payroll allowlist are rejected.
 
 Some team members are on an on-chain vesting plan (an equity-style cliff held in the PayrollVault on Arc). To release their vested USDC early ("release Ada's vested pay", "early vest for Ada"), call release_vesting with their name. This settles a real on-chain transfer, signed by the Dynamic server wallet.
 
@@ -213,6 +214,19 @@ async function draftPayrollRun(env: Env, args: ToolResult): Promise<ToolResult> 
 async function draftPaymentTo(env: Env, args: ToolResult): Promise<ToolResult> {
   const recipient = String(args.recipient_address ?? '').trim();
   if (!recipient) throw new Error('recipient_address required');
+
+  // "Pay Ben Strauss" is a team member, not an ad-hoc address. The model
+  // sometimes routes a name here — redirect it to a subset payroll run so it
+  // pays their salary instead of refusing an un-allowlisted "address".
+  if (!/^0x[0-9a-fA-F]{40}$/.test(recipient)) {
+    const { results: roster } = await env.DB.prepare(
+      'SELECT id, name, salary_micro FROM employees ORDER BY id'
+    ).all<Emp>();
+    const matched = roster.filter((e) => nameMatches(e.name, recipient));
+    if (matched.length) return draftPayrollRun(env, { period: 'today', only: matched.map((e) => e.name) });
+    throw new Error(`"${recipient}" is not a 0x address or a team member`);
+  }
+
   const amountMicro =
     args.amount_usd != null ? Math.round(Number(args.amount_usd) * 1e6) : (await rosterTotal(env)).total;
 
