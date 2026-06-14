@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/manila_logo_mark.png" alt="Manila — the pay envelope, rebuilt onchain" width="460">
+  <img src="assets/manila_mark.png" alt="Manila — the pay envelope, rebuilt onchain" width="220">
 </p>
 
 For a century, salaries were private because they came in a sealed manila envelope. Public chains broke that — which is why stablecoin payroll adoption sits under 1%: nobody wants their salary on a public ledger. Manila brings the envelope back, and pays the team **daily** instead of monthly — gas-free nanopayments make per-day payroll cost a fraction of a cent (a full run settles for $0.003), which is prohibitive on ACH or wire. An AI agent runs payroll from plain-English commands; a deterministic policy engine gates every run, halting an over-cap run for a second signature and **refusing outright** anything that would drain the treasury, redirect funds off the allowlist, or grossly over/under-pay. Disbursements settle as batched, gas-free USDC nanopayments on Arc via Circle Gateway, **sealed** by Unlink so amounts and counterparties stay confidential. Everything is recorded to an employer-only exportable audit trail — open the envelope.
@@ -14,30 +14,21 @@ A real agent-driven payroll run has settled on Arc testnet — three salaries se
 
 ```mermaid
 flowchart LR
-  Employer -->|plain-English command| Agent["Agent (Workers AI tool use,
-  Cloudflare Worker)"]
-  Agent --> Policy["Policy engine
-  cap + allowlist"]
-  Policy -->|over policy| Approval["Pending approval
-  (maker-checker)"]
+  Employer -->|plain-English command| Agent["Agent (Workers AI tool use,<br/>Cloudflare Worker)"]
+  Agent --> Policy["Policy engine<br/>cap + allowlist"]
+  Policy -->|over policy| Approval["Pending approval<br/>(maker-checker)"]
   Approval -->|second signature| Seal
-  Policy -->|pass| Seal["Seal service
-  (402-protected, per employee)"]
+  Policy -->|pass| Seal["Seal service<br/>(402-protected, per employee)"]
   Agent -->|x402 nanopayment per disbursement| Seal
-  Sidecar["Signing sidecar (Node)
-  Dynamic server wallet, MPC"] -->|signs payment authorizations| Agent
-  Seal -->|batched micro-settlement| Gateway["Circle Gateway
-  netted settlement on Arc"]
-  Seal -->|sealed salary transfer| Unlink["Unlink private account
-  amounts + counterparties hidden"]
+  Sidecar["Signing sidecar (Node)<br/>Dynamic server wallet, MPC"] -->|signs payment authorizations| Agent
+  Seal -->|batched micro-settlement| Gateway["Circle Gateway<br/>netted settlement on Arc"]
+  Seal -->|sealed salary transfer| Unlink["Unlink private account<br/>amounts + counterparties hidden"]
   Unlink --> Employees
-  Agent -->|release vested RSUs| Vault["PayrollVaultV3 (Arc)
-  RSU vesting, USDC-settled"]
-  Oracle["Pyth price relay (Arc)
-  live AAPL/USD via Hermes"] -->|share price| Vault
+  Agent -->|release vested RSUs| Vault["PayrollVaultV3 (Arc)<br/>RSU vesting, USDC-settled"]
+  Oracle["Pyth price relay (Arc)<br/>live AAPL/USD via Hermes"] -->|share price| Vault
   Sidecar -->|signs release| Vault
-  Vault -->|USDC payout (publicly verifiable)| Employees
-  Agent --> Audit["Audit log → CSV export"]
+  Vault -->|USDC payout, publicly verifiable| Employees
+  Agent --> Audit["Audit log to CSV export"]
   Seal --> Audit
   Vault --> Audit
 ```
