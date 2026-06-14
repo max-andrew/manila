@@ -10,6 +10,7 @@ import { evaluatePolicy, loadPolicy, type PolicyResult } from './policy';
 import { audit } from './audit';
 import { microToUsd } from './arc';
 import { executeRun } from '../routes/disburse';
+import { readVaultSchedule, releaseVesting, type ReleaseResult } from './vault';
 import type { Env } from '../env';
 
 export const DEFAULT_AGENT_MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
@@ -18,11 +19,18 @@ const SYSTEM_PROMPT = `You are the payroll agent for Manila — confidential USD
 Operate payroll by calling tools. Never invent amounts, names, addresses, or results — the tools read the real roster and policy from the database.
 
 To run payroll (e.g. "run today's payroll", optionally "with a 10% bonus"):
-1. Call draft_payroll_run with the period (default today) and any bonus percentage.
+1. Call draft_payroll_run with the period (default today), any bonus percentage, and optionally who to pay:
+   - everyone: omit the people fields.
+   - specific people ("pay just Ben Strauss"): set "only" to their names, e.g. ["Ben Strauss"].
+   - all but some ("pay everyone but Ada"): set "except" to their names.
+   - "pay everyone else" / the rest who haven't been paid yet today: set "unpaid_only" true.
+   Match the names the user says to the current team listed below.
 2. Call check_policy with the run_id.
 3. If verdict is "pass", call execute_run. If "review", call request_approval — a human adds a second signature. If "rejected", stop — the run is refused.
 
 To pay a specific address (e.g. "send today's pay to 0x..."), call draft_payment_to, then check_policy. Recipients not on the payroll allowlist are rejected.
+
+Some team members are on an on-chain vesting plan (an equity-style cliff held in the PayrollVault on Arc). To release their vested USDC early ("release Ada's vested pay", "early vest for Ada"), call release_vesting with their name. This settles a real on-chain transfer, signed by the Dynamic server wallet.
 
 Call one tool at a time and wait for its result. Reply in one or two terse lowercase sentences, no exclamation points. Money is "sealed", never "sent" or "private".`;
 
@@ -41,6 +49,9 @@ const TOOLS = [
           type: 'number',
           description: 'Optional uniform pay adjustment percent, e.g. 20 for +20%, -10 for a 10% reduction. Default 0.',
         },
+        only: { type: 'array', items: { type: 'string' }, description: 'Pay only these team members (by name).' },
+        except: { type: 'array', items: { type: 'string' }, description: 'Pay everyone except these team members (by name).' },
+        unpaid_only: { type: 'boolean', description: 'Pay only people not yet paid today ("everyone else"/"the rest").' },
       },
       required: [],
     },
@@ -91,6 +102,18 @@ const TOOLS = [
       required: ['run_id', 'reason'],
     },
   },
+  {
+    name: 'release_vesting',
+    description:
+      "Release a team member's vested USDC from the on-chain PayrollVault (their equity-style cliff). Settles a real transfer on Arc, signed by the Dynamic server wallet. Use for 'release Ada's vested pay' / 'early vest for Ada'.",
+    parameters: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', description: 'The team member whose vested USDC to release.' },
+      },
+      required: ['name'],
+    },
+  },
 ];
 
 function todayISO(): string {
@@ -115,19 +138,61 @@ async function rosterTotal(env: Env, multiplier = 1): Promise<{ total: number; c
   return { total, count: results.length };
 }
 
+type Emp = { id: number; name: string; salary_micro: number };
+
+function toNames(v: unknown): string[] {
+  if (Array.isArray(v)) return v.map((x) => String(x).trim()).filter(Boolean);
+  if (typeof v === 'string' && v.trim()) return v.split(/,|\band\b/).map((s) => s.trim()).filter(Boolean);
+  return [];
+}
+
+function nameMatches(employeeName: string, query: string): boolean {
+  const e = employeeName.toLowerCase();
+  const q = query.toLowerCase().trim();
+  if (!q) return false;
+  return e === q || e.includes(q) || q.includes(e) || e.split(/\s+/).includes(q);
+}
+
+// Employees already sealed for this period (so "everyone else" can skip them).
+async function paidTodayIds(env: Env, period: string): Promise<Set<number>> {
+  const { results } = await env.DB.prepare(
+    "SELECT DISTINCT p.employee_id AS id FROM payments p JOIN payroll_runs r ON p.run_id = r.id WHERE r.period = ? AND p.status = 'sealed'"
+  )
+    .bind(period)
+    .all<{ id: number }>();
+  return new Set(results.map((r) => r.id));
+}
+
 async function draftPayrollRun(env: Env, args: ToolResult): Promise<ToolResult> {
   const period = normalizePeriod(String(args.period ?? 'today'));
   const bonusPct = Number(args.bonus_pct ?? 0) || 0;
   const multiplier = 1 + bonusPct / 100;
 
-  const { total, count } = await rosterTotal(env, multiplier);
-  if (!count) throw new Error('no employees on the roster');
-  const note = bonusPct ? `${bonusPct > 0 ? '+' : ''}${bonusPct}% adjustment` : null;
+  const { results: roster } = await env.DB.prepare('SELECT id, name, salary_micro FROM employees ORDER BY id').all<Emp>();
+  if (!roster.length) throw new Error('no employees on the roster');
+
+  const only = toNames(args.only);
+  const except = toNames(args.except);
+  let selected = roster;
+  if (only.length) selected = roster.filter((e) => only.some((n) => nameMatches(e.name, n)));
+  else if (except.length) selected = roster.filter((e) => !except.some((n) => nameMatches(e.name, n)));
+  if (args.unpaid_only) {
+    const paid = await paidTodayIds(env, period);
+    selected = selected.filter((e) => !paid.has(e.id));
+  }
+  if (!selected.length) throw new Error('no matching team members to pay');
+
+  const total = selected.reduce((sum, e) => sum + Math.round(e.salary_micro * multiplier), 0);
+  const subset = selected.length < roster.length;
+  const employeeIds = subset ? JSON.stringify(selected.map((e) => e.id)) : null;
+  const names = selected.map((e) => e.name);
+  const note =
+    [bonusPct ? `${bonusPct > 0 ? '+' : ''}${bonusPct}%` : '', subset ? names.join(', ') : ''].filter(Boolean).join(' · ') || null;
 
   const run = await env.DB.prepare(
-    "INSERT INTO payroll_runs (period, status, amount_multiplier, total_micro, requested_by, note) VALUES (?, 'draft', ?, ?, 'agent', ?) RETURNING id"
+    "INSERT INTO payroll_runs (period, status, amount_multiplier, total_micro, requested_by, note, employee_ids) VALUES (?, 'draft', ?, ?, 'agent', ?, ?) RETURNING id"
   )
-    .bind(period, multiplier, total, note)
+    .bind(period, multiplier, total, note, employeeIds)
     .first<{ id: number }>();
   if (!run) throw new Error('failed to create run');
 
@@ -135,9 +200,9 @@ async function draftPayrollRun(env: Env, args: ToolResult): Promise<ToolResult> 
     actor: 'agent',
     action: 'run_drafted',
     run_id: run.id,
-    detail: { period, bonus_pct: bonusPct, employee_count: count, total_micro: total },
+    detail: { period, bonus_pct: bonusPct, employees: names, total_micro: total },
   });
-  return { run_id: run.id, period, employee_count: count, bonus_pct: bonusPct, total_micro: total, total_usd: microToUsd(total) };
+  return { run_id: run.id, period, employee_count: selected.length, employee_names: names, bonus_pct: bonusPct, total_micro: total, total_usd: microToUsd(total) };
 }
 
 async function draftPaymentTo(env: Env, args: ToolResult): Promise<ToolResult> {
@@ -205,14 +270,23 @@ export async function setExecutingAndRun(env: Env, runId: number) {
   return executeRun(env, runId);
 }
 
-// Has this period already been paid? Guards against double-paying a day.
-async function alreadyPaid(env: Env, period: string, excludeRunId: number): Promise<boolean> {
-  const row = await env.DB.prepare(
-    "SELECT id FROM payroll_runs WHERE period = ? AND status = 'sealed' AND id != ? LIMIT 1"
-  )
-    .bind(period, excludeRunId)
-    .first();
-  return !!row;
+// Already-paid guard: a run is a duplicate only if everyone it targets has
+// already been sealed today. (So "pay just Ben" then "pay everyone else" both
+// go through; running the same set twice is held for confirmation.)
+async function runEmployeeIds(env: Env, runId: number): Promise<number[]> {
+  const run = await env.DB.prepare('SELECT employee_ids FROM payroll_runs WHERE id = ?')
+    .bind(runId)
+    .first<{ employee_ids: string | null }>();
+  if (run?.employee_ids) return JSON.parse(run.employee_ids) as number[];
+  const { results } = await env.DB.prepare('SELECT id FROM employees').all<{ id: number }>();
+  return results.map((r) => r.id);
+}
+
+async function alreadyPaid(env: Env, runId: number, period: string): Promise<boolean> {
+  const ids = await runEmployeeIds(env, runId);
+  if (!ids.length) return false;
+  const paid = await paidTodayIds(env, period);
+  return ids.every((id) => paid.has(id));
 }
 
 async function executeRunTool(env: Env, args: ToolResult): Promise<ToolResult> {
@@ -228,8 +302,8 @@ async function executeRunTool(env: Env, args: ToolResult): Promise<ToolResult> {
   if (run.custom_recipient) {
     return { run_id: runId, executed: false, error: 'ad-hoc payments are not auto-executed' };
   }
-  if (await alreadyPaid(env, run.period, runId)) {
-    await requestApproval(env, { run_id: runId, reason: `payroll for ${run.period} was already sealed — confirm to pay again` });
+  if (await alreadyPaid(env, runId, run.period)) {
+    await requestApproval(env, { run_id: runId, reason: `this group was already sealed today — confirm to pay again` });
     return { run_id: runId, executed: false, status: 'pending_approval', reason: 'already paid; held for confirmation' };
   }
   const result = await setExecutingAndRun(env, runId);
@@ -255,6 +329,35 @@ async function rejectRun(env: Env, runId: number, reason: string): Promise<void>
   await audit(env.DB, { actor: 'agent', action: 'policy_rejected', run_id: runId, detail: { reason }, policy_result: 'blocked' });
 }
 
+// Release vested USDC from the on-chain vault for a named team member. This is
+// a terminal action (no draft/policy branch) — it settles immediately on Arc.
+async function releaseVestingTool(env: Env, args: ToolResult): Promise<ToolResult> {
+  const query = String(args.name ?? args.beneficiary ?? '').trim();
+  if (!query) throw new Error('which team member?');
+  const { results: roster } = await env.DB.prepare('SELECT id, name, wallet FROM employees ORDER BY id')
+    .all<{ id: number; name: string; wallet: string }>();
+  const emp = roster.find((e) => nameMatches(e.name, query));
+  if (!emp) throw new Error(`no team member matches "${query}"`);
+
+  const schedule = await readVaultSchedule(env, emp.wallet);
+  if (!schedule) {
+    return { released: false, name: emp.name, error: `${emp.name} has no on-chain vesting schedule` };
+  }
+
+  let result: ReleaseResult;
+  try {
+    result = await releaseVesting(env, emp.wallet);
+  } catch (err) {
+    result = { released: false, beneficiary: emp.wallet, error: err instanceof Error ? err.message : String(err) };
+  }
+  await audit(env.DB, {
+    actor: 'agent',
+    action: result.released ? 'vesting_released' : 'vesting_release_failed',
+    detail: { employee_id: emp.id, name: emp.name, amount_micro: result.amount_micro, tx_hash: result.tx_hash, error: result.error },
+  });
+  return { ...result, name: emp.name, employee_id: emp.id };
+}
+
 async function dispatch(env: Env, name: string, args: ToolResult): Promise<ToolResult> {
   switch (name) {
     case 'draft_payroll_run': return draftPayrollRun(env, args);
@@ -262,6 +365,7 @@ async function dispatch(env: Env, name: string, args: ToolResult): Promise<ToolR
     case 'check_policy': return checkPolicy(env, args);
     case 'execute_run': return executeRunTool(env, args);
     case 'request_approval': return requestApproval(env, args);
+    case 'release_vesting': return releaseVestingTool(env, args);
     default: return { error: `unknown tool ${name}` };
   }
 }
@@ -291,13 +395,16 @@ export type AgentOutcome = {
 
 export async function runAgent(env: Env, instruction: string): Promise<AgentOutcome> {
   const model = env.AGENT_MODEL || DEFAULT_AGENT_MODEL;
+  const { results: roster } = await env.DB.prepare('SELECT name FROM employees ORDER BY id').all<{ name: string }>();
+  const rosterNames = roster.map((r) => r.name);
   const messages: Array<Record<string, unknown>> = [
-    { role: 'system', content: SYSTEM_PROMPT },
+    { role: 'system', content: `${SYSTEM_PROMPT}\n\nCurrent team: ${rosterNames.join(', ') || '(none)'}.` },
     { role: 'user', content: instruction },
   ];
   const toolsCalled: string[] = [];
   const completed = new Set<string>();
   let lastRunId: number | null = null;
+  let vesting: ToolResult | null = null; // a release_vesting result (terminal)
   let reply = '';
   let repeated = false;
 
@@ -322,6 +429,7 @@ export async function runAgent(env: Env, instruction: string): Promise<AgentOutc
       }
       toolsCalled.push(name);
       if (typeof result.run_id === 'number') lastRunId = result.run_id;
+      if (name === 'release_vesting') { vesting = result; repeated = true; break; }
       messages.push({ role: 'tool', name, content: JSON.stringify(result) });
     }
     // Once a run is drafted, the deterministic engine finishes it (policy +
@@ -334,17 +442,25 @@ export async function runAgent(env: Env, instruction: string): Promise<AgentOutc
   // output with no usable tool call. The command set is small, so parse the
   // instruction ourselves — the agent always acts correctly and never echoes
   // model garbage back to the user.
-  if (lastRunId == null) {
-    const intent = parseIntent(instruction);
+  if (lastRunId == null && vesting == null) {
+    const intent = parseIntent(instruction, rosterNames);
     if (intent) {
       try {
         const result = await dispatch(env, intent.tool, intent.args);
-        if (typeof result.run_id === 'number') {
+        if (intent.tool === 'release_vesting') {
+          vesting = result;
+          toolsCalled.push(`${intent.tool} (fallback)`);
+        } else if (typeof result.run_id === 'number') {
           lastRunId = result.run_id;
           toolsCalled.push(`${intent.tool} (fallback)`);
         }
       } catch { /* fall through to the help message */ }
     }
+  }
+
+  // A vesting release is terminal — reply from its on-chain outcome.
+  if (vesting) {
+    return { reply: vestingReply(vesting), run_id: null, tools_called: toolsCalled, run: vesting };
   }
 
   // Deterministic gate: finish whatever was drafted along the correct branch.
@@ -358,17 +474,37 @@ export async function runAgent(env: Env, instruction: string): Promise<AgentOutc
 }
 
 // Last-resort intent parser for when the model fails to emit a tool call.
-function parseIntent(instruction: string): { tool: string; args: ToolResult } | null {
+function parseIntent(instruction: string, rosterNames: string[] = []): { tool: string; args: ToolResult } | null {
   const text = instruction.toLowerCase();
   const addr = instruction.match(/0x[0-9a-fA-F]{40}/);
   if (addr && /\b(send|pay|transfer|to|wallet|address)\b/.test(text)) {
     return { tool: 'draft_payment_to', args: { recipient_address: addr[0] } };
   }
+  // Vesting release ("release Ada's vested pay", "early vest for Ada") — checked
+  // before payroll so the word "pay" in the phrasing doesn't misroute it.
+  if (/\b(vest|vested|vesting|cliff)\b/.test(text) || /\brelease\b/.test(text)) {
+    const who = rosterNames.find((n) =>
+      n.toLowerCase().split(/\s+/).some((part) => new RegExp(`\\b${part}\\b`).test(text)) || text.includes(n.toLowerCase())
+    );
+    if (who) return { tool: 'release_vesting', args: { name: who } };
+  }
   if (/payroll|salar|\bpay\b|\brun\b/.test(text)) {
     const m = text.match(/(-?\d+(?:\.\d+)?)\s*%/);
     let bonus = m ? Number(m[1]) : 0;
     if (bonus > 0 && /\b(reduce|cut|lower|less|decrease|dock|drop)\b/.test(text)) bonus = -bonus;
-    return { tool: 'draft_payroll_run', args: { period: 'today', bonus_pct: bonus } };
+    const args: ToolResult = { period: 'today', bonus_pct: bonus };
+    if (/everyone else|everybody else|the rest|remaining|the others/.test(text)) {
+      args.unpaid_only = true;
+    } else {
+      const mentioned = rosterNames.filter((n) =>
+        n.toLowerCase().split(/\s+/).some((part) => new RegExp(`\\b${part}\\b`).test(text)) || text.includes(n.toLowerCase())
+      );
+      if (mentioned.length && mentioned.length < rosterNames.length) {
+        if (/\b(except|but|besides|other than|aside from)\b/.test(text)) args.except = mentioned;
+        else args.only = mentioned;
+      }
+    }
+    return { tool: 'draft_payroll_run', args };
   }
   return null;
 }
@@ -387,8 +523,8 @@ async function finalizeRun(env: Env, runId: number): Promise<Record<string, unkn
     const policy: PolicyResult | null = after?.policy_result ? JSON.parse(after.policy_result) : null;
     const reason = policy?.reasons?.[0] ?? 'policy';
     if (policy?.verdict === 'pass' && !row.custom_recipient) {
-      if (await alreadyPaid(env, row.period, runId)) {
-        await requestApproval(env, { run_id: runId, reason: `payroll for ${row.period} was already sealed — confirm to pay again` });
+      if (await alreadyPaid(env, runId, row.period)) {
+        await requestApproval(env, { run_id: runId, reason: `this group was already sealed today — confirm to pay again` });
       } else {
         await setExecutingAndRun(env, runId);
       }
@@ -402,21 +538,39 @@ async function finalizeRun(env: Env, runId: number): Promise<Record<string, unkn
     }
   }
 
-  return (
+  const run =
     (await env.DB.prepare(
-      'SELECT id, period, status, total_micro, amount_multiplier, note, policy_result, custom_recipient FROM payroll_runs WHERE id = ?'
+      'SELECT id, period, status, total_micro, amount_multiplier, note, policy_result, custom_recipient, employee_ids FROM payroll_runs WHERE id = ?'
     )
       .bind(runId)
-      .first<Record<string, unknown>>()) ?? undefined
-  );
+      .first<Record<string, unknown>>()) ?? undefined;
+  // Resolve the names of a subset run, for a name-aware reply.
+  if (run && run.employee_ids) {
+    const ids = JSON.parse(String(run.employee_ids)) as number[];
+    const { results } = await env.DB.prepare(
+      `SELECT name FROM employees WHERE id IN (${ids.map(() => '?').join(',')}) ORDER BY id`
+    )
+      .bind(...ids)
+      .all<{ name: string }>();
+    run.employee_names = results.map((r) => r.name);
+  }
+  return run;
+}
+
+function vestingReply(v: ToolResult): string {
+  const name = String(v.name ?? 'the beneficiary');
+  if (v.released) return `released ${v.amount_usd} of vested USDC to ${name} on-chain, signed by the dynamic wallet.`;
+  return `couldn't release for ${name} — ${v.error ?? 'no vested amount available'}.`;
 }
 
 function deterministicReply(run: Record<string, unknown>): string {
   const status = String(run.status);
   const total = Number(run.total_micro);
   const policy: PolicyResult | null = run.policy_result ? JSON.parse(String(run.policy_result)) : null;
+  const names = run.employee_names as string[] | undefined;
+  const who = Array.isArray(names) && names.length ? ` to ${names.join(' and ')}` : ' across the roster';
 
-  if (status === 'sealed') return `Sealed. Run ${run.id}, ${microToUsd(total)} paid for the day.`;
+  if (status === 'sealed') return `Sealed. ${microToUsd(total)}${who}.`;
   if (status === 'pending_approval') {
     // A passing run held for approval = already paid today (double-pay guard);
     // otherwise it's an over-cap run awaiting a second signature.
