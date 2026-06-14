@@ -170,7 +170,9 @@ async function sendFromReleaser(env: Env, data: `0x${string}`): Promise<`0x${str
   const client = publicClient(env);
   const from = env.TREASURY_WALLET_ADDRESS as `0x${string}`;
   const [nonce, gas, fees] = await Promise.all([
-    client.getTransactionCount({ address: from }),
+    // 'pending' so back-to-back releases/resets don't reuse a nonce that's still
+    // in the mempool ("nonce too low").
+    client.getTransactionCount({ address: from, blockTag: 'pending' }),
     client.estimateGas({ account: from, to: PAYROLL_VAULT_ADDRESS, data }).catch(() => 150_000n),
     client.estimateFeesPerGas().catch(() => null),
   ]);
