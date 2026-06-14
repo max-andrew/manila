@@ -162,6 +162,11 @@
   .vest-status.ok { color: #3f6f47; }
   .vest-status.err { color: var(--stamp); }
   .vest-status a { color: inherit; }
+  .vest-oracle { font-size: .82rem; color: var(--ink); margin: 0 0 1rem; display: flex; align-items: center; gap: .45rem; flex-wrap: wrap; padding: .5rem .75rem; background: #f1f7f1; border: 1px solid #cfe0cf; border-radius: 8px; }
+  .vest-oracle .sub { color: var(--khaki); }
+  .vest-oracle a { color: var(--ink); }
+  .dot.live { background: #4a7a52; animation: pulse 2s infinite; }
+  @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(74,122,82,.45); } 70% { box-shadow: 0 0 0 5px rgba(74,122,82,0); } 100% { box-shadow: 0 0 0 0 rgba(74,122,82,0); } }
   /* Dynamic signer card */
   #signer-body { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem 1.4rem; }
   .signer-addr { font-family: var(--mono); font-size: 1.05rem; color: var(--ink); text-decoration: none; }
@@ -278,7 +283,7 @@
       <p>Under <b>1% of payroll</b> runs on stablecoins — a public chain turns every salary into a permanent public record. Manila gives an agent two USDC rails, run from plain English under policy controls no instruction can talk past:</p>
       <ul class="rails">
         <li><b>Sealed daily salary</b> — private transfers paid <b>every day</b>; gas-free nanopayments make per-day payroll cost a fraction of a cent, impractical on ACH or wire.</li>
-        <li><b>Programmable vesting</b> — equity-style cliffs streamed from an on-chain USDC vault the agent releases as they accrue, publicly verifiable on Arc.</li>
+        <li><b>Programmable equity</b> — RSU grants priced by a live stock oracle and settled in USDC on-chain, the agent releasing each tranche as it vests.</li>
       </ul>
     </div>
     <figure>
@@ -341,8 +346,9 @@
     </div>
 
     <section class="card" id="vesting" hidden>
-      <h2>Vesting — programmable USDC on Arc <span class="badge" id="vesting-badge"></span></h2>
-      <p class="vesting-intro">An equity-style cliff held on-chain in the <b>PayrollVault</b>. Unlike sealed salary, vault funds are <b>publicly verifiable</b> — USDC sits locked in the contract and visibly transfers out as it vests. The <b>agent</b> releases it, signed by the <b>Dynamic</b> wallet (the vault's authorized releaser); the employer funds it up front.</p>
+      <h2>Equity vesting — RSUs settled in USDC <span class="badge" id="vesting-badge"></span></h2>
+      <p class="vesting-intro">Equity that pays in cash. Each grant vests a number of <b>RSU shares</b> on a cliff; on release the contract reads a live company share price from an on-chain <b>oracle</b> and pays the vested shares' value in <b>USDC</b> — so the grant tracks the real stock, but settles in stablecoin. The <b>agent</b> releases it, signed by the <b>Dynamic</b> wallet; every release is verifiable on Arc.</p>
+      <div id="vesting-oracle" class="vest-oracle"></div>
       <div id="vesting-body"></div>
       <div id="vesting-status" class="vest-status"></div>
       <div id="vesting-links" class="explorer-links"></div>
@@ -463,21 +469,26 @@ function renderVesting(v) {
   card.hidden = false;
   el('vesting-badge').textContent = 'deployed · arc testnet';
   const m = v.vault;
+  const o = v.oracle, mo = m.oracle || {};
+  el('vesting-oracle').innerHTML = o
+    ? `<span class="dot live"></span><b>${esc(o.ticker)}</b> $${esc(o.price_usd)} <span class="sub">· live share price via <a href="${mo.feed_url}" target="_blank" rel="noopener">Pyth</a>, relayed on-chain to Arc — drives every RSU's USDC value</span>`
+    : `<span class="sub">Oracle price unavailable — relay a tick to value the RSUs.</span>`;
   el('vesting-links').innerHTML = [
-    `<a href="${m.source_url}" target="_blank" rel="noopener" title="PayrollVaultV2.sol — the Solidity source">Contract source&nbsp;↗</a>`,
+    `<a href="${m.source_url}" target="_blank" rel="noopener" title="PayrollVaultV3.sol — the Solidity source">Contract source&nbsp;↗</a>`,
     `<a href="${m.address_url}" target="_blank" rel="noopener" title="${m.address}">Deployed contract&nbsp;↗</a>`,
-    `<a href="${m.deploy_tx_url}" target="_blank" rel="noopener" title="The contract deployment on Arc">Deployment&nbsp;↗</a>`,
-    `<a href="${m.schedule_tx_url}" target="_blank" rel="noopener" title="The on-chain tx that created and funded this vesting schedule (USDC locked into the vault)">Funding tx&nbsp;↗</a>`,
-  ].join('');
+    mo.relay_url ? `<a href="${mo.relay_url}" target="_blank" rel="noopener" title="The Pyth-shaped price oracle on Arc">Price oracle&nbsp;↗</a>` : '',
+    mo.relay_tx_url ? `<a href="${mo.relay_tx_url}" target="_blank" rel="noopener" title="A real ${esc(mo.ticker || 'stock')} price posted on-chain">Oracle tx&nbsp;↗</a>` : '',
+    `<a href="${m.schedule_tx_url}" target="_blank" rel="noopener" title="The on-chain tx that granted this RSU schedule">Grant tx&nbsp;↗</a>`,
+  ].filter(Boolean).join('');
 
   const rows = v.schedules || [];
   if (!rows.length) {
-    el('vesting-body').innerHTML = '<p class="muted" style="font-size:.8rem">No active vesting schedules. The employer funds one up front; the agent releases it on-chain as it vests.</p>';
+    el('vesting-body').innerHTML = '<p class="muted" style="font-size:.8rem">No active RSU grants. The employer grants shares up front; the agent releases their USDC value on-chain as they vest.</p>';
     return;
   }
   el('vesting-body').innerHTML = rows.map(s => `
     <div class="vest-row">
-      <div class="vest-name">${esc(s.name)}<span class="sub"><a href="${s.beneficiary_url}" target="_blank" rel="noopener" title="Beneficiary on Arc · ${s.beneficiary}">${short(s.beneficiary)}&nbsp;↗</a></span></div>
+      <div class="vest-name">${esc(s.name)}<span class="sub">${esc(s.total_shares)} ${esc((o&&o.ticker)||'')} RSUs</span><span class="sub"><a href="${s.beneficiary_url}" target="_blank" rel="noopener" title="Beneficiary on Arc · ${s.beneficiary}">${short(s.beneficiary)}&nbsp;↗</a></span></div>
       <div>
         <div class="vest-track"><div class="vest-fill" style="width:${s.vested_pct}%"></div><div class="vest-released" style="width:${s.released_pct}%"></div></div>
         <div class="vest-meta">${s.cliff_passed ? 'cliff passed' : 'in cliff'} · vested $${s.vested_usd} of $${s.total_usd} · released $${s.released_usd}</div>
