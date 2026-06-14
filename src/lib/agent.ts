@@ -153,10 +153,15 @@ function nameMatches(employeeName: string, query: string): boolean {
   return e === q || e.includes(q) || q.includes(e) || e.split(/\s+/).includes(q);
 }
 
-// Employees already sealed for this period (so "everyone else" can skip them).
+// Employees already sealed for this period (so "everyone else" can skip them,
+// and a repeat run is held for confirmation). Time-aware: only payments sealed
+// since the last demo reset count, so "Reset demo" un-gates a fresh run.
 async function paidTodayIds(env: Env, period: string): Promise<Set<number>> {
   const { results } = await env.DB.prepare(
-    "SELECT DISTINCT p.employee_id AS id FROM payments p JOIN payroll_runs r ON p.run_id = r.id WHERE r.period = ? AND p.status = 'sealed'"
+    `SELECT DISTINCT p.employee_id AS id FROM payments p
+       JOIN payroll_runs r ON p.run_id = r.id
+      WHERE r.period = ? AND p.status = 'sealed'
+        AND p.created_at > COALESCE((SELECT value FROM app_state WHERE key = 'reset_at'), '1970-01-01 00:00:00')`
   )
     .bind(period)
     .all<{ id: number }>();
@@ -397,8 +402,16 @@ export async function runAgent(env: Env, instruction: string): Promise<AgentOutc
   const model = env.AGENT_MODEL || DEFAULT_AGENT_MODEL;
   const { results: roster } = await env.DB.prepare('SELECT name FROM employees ORDER BY id').all<{ name: string }>();
   const rosterNames = roster.map((r) => r.name);
+  // Give the model the live control band so it can reason about requests like
+  // "the maximally acceptable bonus" (= the policy's max) without guessing.
+  const policy = await loadPolicy(env);
+  const controls =
+    `Controls — pay band ${policy.min_pay_pct}% to +${policy.max_bonus_pct}% (a request outside this is refused); ` +
+    `per-run cap $${Math.round(policy.per_run_cap_micro / 1e6)} (over needs a second signature); ` +
+    `hard ceiling $${Math.round(policy.hard_cap_micro / 1e6)}. ` +
+    `The "maximally acceptable bonus" is +${policy.max_bonus_pct}%.`;
   const messages: Array<Record<string, unknown>> = [
-    { role: 'system', content: `${SYSTEM_PROMPT}\n\nCurrent team: ${rosterNames.join(', ') || '(none)'}.` },
+    { role: 'system', content: `${SYSTEM_PROMPT}\n\nCurrent team: ${rosterNames.join(', ') || '(none)'}.\n${controls}` },
     { role: 'user', content: instruction },
   ];
   const toolsCalled: string[] = [];
@@ -443,7 +456,7 @@ export async function runAgent(env: Env, instruction: string): Promise<AgentOutc
   // instruction ourselves — the agent always acts correctly and never echoes
   // model garbage back to the user.
   if (lastRunId == null && vesting == null) {
-    const intent = parseIntent(instruction, rosterNames);
+    const intent = parseIntent(instruction, rosterNames, policy.max_bonus_pct);
     if (intent) {
       try {
         const result = await dispatch(env, intent.tool, intent.args);
@@ -474,7 +487,7 @@ export async function runAgent(env: Env, instruction: string): Promise<AgentOutc
 }
 
 // Last-resort intent parser for when the model fails to emit a tool call.
-function parseIntent(instruction: string, rosterNames: string[] = []): { tool: string; args: ToolResult } | null {
+function parseIntent(instruction: string, rosterNames: string[] = [], maxBonusPct = 0): { tool: string; args: ToolResult } | null {
   const text = instruction.toLowerCase();
   const addr = instruction.match(/0x[0-9a-fA-F]{40}/);
   if (addr && /\b(send|pay|transfer|to|wallet|address)\b/.test(text)) {
@@ -491,6 +504,8 @@ function parseIntent(instruction: string, rosterNames: string[] = []): { tool: s
   if (/payroll|salar|\bpay\b|\brun\b/.test(text)) {
     const m = text.match(/(-?\d+(?:\.\d+)?)\s*%/);
     let bonus = m ? Number(m[1]) : 0;
+    // "the maximally acceptable bonus" / "max allowed bonus" → the policy ceiling.
+    if (!m && /\bmax(?:imal|imum|imally)?\b/.test(text) && /bonus/.test(text)) bonus = maxBonusPct;
     if (bonus > 0 && /\b(reduce|cut|lower|less|decrease|dock|drop)\b/.test(text)) bonus = -bonus;
     const args: ToolResult = { period: 'today', bonus_pct: bonus };
     if (/everyone else|everybody else|the rest|remaining|the others/.test(text)) {
