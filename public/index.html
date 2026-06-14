@@ -129,6 +129,26 @@
   .explorer-links { margin-top: .8rem; display: flex; flex-wrap: wrap; gap: .15rem .9rem; }
   .explorer-links a { font-family: var(--mono); font-size: .7rem; color: var(--khaki); text-decoration: none; white-space: nowrap; }
   .explorer-links a:hover { color: var(--ink); text-decoration: underline; }
+  .custody-note { font-size: .66rem; color: var(--khaki); margin-top: .6rem; line-height: 1.5; }
+  /* Vesting card */
+  .badge { font-family: var(--mono); font-size: .56rem; text-transform: uppercase; letter-spacing: .12em; color: #4a7a52; border: 1px solid #cfe0cf; background: #f1f7f1; border-radius: 999px; padding: .14rem .55rem; vertical-align: middle; margin-left: .35rem; }
+  #vesting .vesting-intro { font-size: .8rem; color: var(--khaki); margin: .15rem 0 1rem; max-width: 66ch; line-height: 1.55; }
+  .vest-row { display: grid; grid-template-columns: 8.5rem 1fr 7.5rem; gap: 1rem; align-items: center; padding: .7rem 0; border-top: 1px solid var(--line); }
+  .vest-row:first-child { border-top: none; }
+  .vest-name { font-size: .92rem; color: var(--ink); }
+  .vest-name .sub { display: block; margin-top: .15rem; }
+  .vest-name .sub a { font-family: var(--mono); font-size: .64rem; color: var(--khaki); text-decoration: none; }
+  .vest-name .sub a:hover { color: var(--ink); text-decoration: underline; }
+  .vest-track { position: relative; height: 8px; border-radius: 4px; background: #efe7d6; overflow: hidden; }
+  .vest-fill { position: absolute; top: 0; bottom: 0; left: 0; background: var(--manila); }
+  .vest-released { position: absolute; top: 0; bottom: 0; left: 0; background: var(--ink); opacity: .85; }
+  .vest-meta { font-size: .65rem; color: var(--khaki); margin-top: .35rem; font-family: var(--mono); }
+  .vest-act { text-align: right; }
+  .vest-amt { font-family: var(--mono); font-size: 1.05rem; color: var(--ink); }
+  .vest-amt .sub { display: block; font-size: .58rem; color: var(--khaki); text-transform: uppercase; letter-spacing: .1em; }
+  .vest-release-btn { margin-top: .35rem; font-family: var(--mono); font-size: .66rem; letter-spacing: .03em; color: var(--paper); background: var(--ink); border: none; border-radius: 6px; padding: .3rem .6rem; cursor: pointer; }
+  .vest-release-btn:hover { background: #000; }
+  .vest-release-btn:disabled { opacity: .5; cursor: default; }
 
   /* team roster */
   table { width: 100%; border-collapse: collapse; font-size: .82rem; }
@@ -198,6 +218,8 @@
     #treasury-balance { font-size: 1.85rem; }
     .msg { max-width: 92%; }
     .controls { gap: 1.1rem 1.8rem; }
+    .vest-row { grid-template-columns: 1fr auto; gap: .5rem .9rem; }
+    .vest-row > div:nth-child(2) { grid-column: 1 / -1; order: 3; }
     .audit-scroll { overflow-x: auto; }
     #audit-table { min-width: 22rem; }
     footer { gap: .35rem .9rem; }
@@ -250,7 +272,7 @@
         <input id="chat-input" type="text" placeholder="Run today's payroll" />
         <button type="submit" id="chat-send">Send</button>
       </form>
-      <p class="agent-foot">Manual today — a <b>Cloudflare Cron Trigger</b> can run it daily, hands-off.</p>
+      <p class="agent-foot">Each payment is signed by a <b>Dynamic</b> server wallet — the agent holds no keys. Run on demand, or automate daily with a <b>Cloudflare Cron Trigger</b>.</p>
     </section>
 
     <section class="card" id="policy">
@@ -262,9 +284,10 @@
       <section class="card" id="treasury">
         <h2>Treasury</h2>
         <div id="treasury-balance" class="muted">—</div>
-        <div id="treasury-sub"><div class="l1">sealed payroll balance</div><div class="l2">private USDC on Arc</div></div>
+        <div id="treasury-sub"><div class="l1">sealed payroll balance</div><div class="l2">private USDC in the Unlink pool — off the public explorer</div></div>
         <div id="nano-balance"></div>
         <div id="treasury-links" class="explorer-links"></div>
+        <div id="treasury-note" class="custody-note">The signer holds no funds — sealed pay lives in the <b>Unlink</b> pool, seal fees in <b>Circle Gateway</b>. The on-chain, explorer-visible path is the vesting vault below.</div>
       </section>
 
       <section class="card" id="team">
@@ -280,6 +303,13 @@
         </div>
       </section>
     </div>
+
+    <section class="card" id="vesting" hidden>
+      <h2>Vesting — programmable USDC on Arc <span class="badge" id="vesting-badge"></span></h2>
+      <p class="vesting-intro">An equity-style cliff held on-chain in the <b>PayrollVault</b>. Unlike sealed salary, vault funds are <b>publicly verifiable</b> — USDC sits locked in the contract and visibly transfers out as it vests. The <b>agent</b> releases it, signed by the <b>Dynamic</b> wallet (the vault's authorized releaser); the employer funds it up front.</p>
+      <div id="vesting-body"></div>
+      <div id="vesting-links" class="explorer-links"></div>
+    </section>
 
     <section class="card" id="audit">
       <h2>Audit</h2>
@@ -299,6 +329,7 @@
   <footer>
     <span>Manila</span>
     <span class="muted">The pay envelope, rebuilt onchain.</span>
+    <button id="reset-demo" class="link-btn">↺ Reset demo</button>
     <span class="stack muted">Dynamic · Circle Gateway · Unlink · Arc · Workers AI</span>
   </footer>
 
@@ -323,10 +354,9 @@ function sealCell(refsJson) {
   return hash ? `<a href="${EXPLORER}${hash}" target="_blank" rel="noopener" title="View sealed disbursement on Arc: ${hash}">${short(hash)}&nbsp;↗</a>` : '';
 }
 
-function renderRoster(employees) {
+function renderRoster(employees, balances = {}) {
   el('add-employee').hidden = !manageMode;
   el('manage-toggle').textContent = manageMode ? 'Done' : 'Manage';
-  const today = new Date().toISOString().slice(0, 10);
   const table = el('employees');
   const empty = '<tr><td class="muted">No team members.</td></tr>';
   const total = employees.reduce((s, e) => s + Number(e.salary_micro), 0);
@@ -342,26 +372,64 @@ function renderRoster(employees) {
     table.querySelectorAll('.rate-input').forEach(i => i.onchange = () => updateRate(i.dataset.id, i.value));
   } else {
     const foot = employees.length ? `<tfoot><tr><td>Total · per day</td><td></td><td class="amt r">${usd(total)}</td></tr></tfoot>` : '';
-    table.innerHTML = `<thead><tr><th>Name</th><th class="c">Paid today</th><th class="r">Per day</th></tr></thead><tbody>${
+    table.innerHTML = `<thead><tr><th>Name</th><th class="r">Sealed balance</th><th class="r">Per day</th></tr></thead><tbody>${
       employees.map(e => {
-        const paidToday = e.last_paid_at && String(e.last_paid_at).slice(0, 10) === today;
-        const status = paidToday
-          ? `<a class="paid" href="${EXPLORER}${e.last_seal_ref}" target="_blank" rel="noopener" title="Sealed today — view on Arc (amount stays hidden)">paid ✓</a>`
-          : `<span class="unpaid">not yet</span>`;
-        return `<tr><td>${esc(e.name)}</td><td class="c">${status}</td><td class="amt r">${usd(e.salary_micro)}</td></tr>`;
+        const bal = balances ? balances[e.id] : null;
+        const has = bal != null && Number(String(bal).replace(/,/g, '')) > 0;
+        const cell = has
+          ? `<a class="paid" ${e.last_seal_ref ? `href="${EXPLORER}${e.last_seal_ref}" target="_blank" rel="noopener"` : ''} title="Private balance — visible to the employer, hidden on the public explorer${e.last_seal_ref ? ' · click for the on-chain transaction' : ''}">$${bal}${e.last_seal_ref ? '&nbsp;↗' : ''}</a>`
+          : `<span class="unpaid">$0.00</span>`;
+        return `<tr><td>${esc(e.name)}</td><td class="amt r">${cell}</td><td class="amt r">${usd(e.salary_micro)}</td></tr>`;
       }).join('') || empty
     }</tbody>${foot}`;
   }
 }
 
+function renderVesting(v) {
+  const card = el('vesting');
+  if (!v || !v.vault) { card.hidden = true; return; }
+  card.hidden = false;
+  el('vesting-badge').textContent = 'deployed · arc testnet';
+  const m = v.vault;
+  el('vesting-links').innerHTML = [
+    `<a href="${m.source_url}" target="_blank" rel="noopener" title="PayrollVault.sol — the Solidity source">Contract source&nbsp;↗</a>`,
+    `<a href="${m.address_url}" target="_blank" rel="noopener" title="${m.address}">Deployed contract&nbsp;↗</a>`,
+    `<a href="${m.schedule_tx_url}" target="_blank" rel="noopener" title="A real schedule funded on Arc">Proof: vest&nbsp;↗</a>`,
+    `<a href="${m.release_tx_url}" target="_blank" rel="noopener" title="A real release paid out on Arc">release&nbsp;↗</a>`,
+  ].join('');
+
+  const rows = v.schedules || [];
+  if (!rows.length) {
+    el('vesting-body').innerHTML = '<p class="muted" style="font-size:.8rem">No active vesting schedules. The employer funds one up front; the agent releases it on-chain as it vests.</p>';
+    return;
+  }
+  el('vesting-body').innerHTML = rows.map(s => `
+    <div class="vest-row">
+      <div class="vest-name">${esc(s.name)}<span class="sub"><a href="${s.beneficiary_url}" target="_blank" rel="noopener" title="Beneficiary on Arc · ${s.beneficiary}">${short(s.beneficiary)}&nbsp;↗</a></span></div>
+      <div>
+        <div class="vest-track"><div class="vest-fill" style="width:${s.vested_pct}%"></div><div class="vest-released" style="width:${s.released_pct}%"></div></div>
+        <div class="vest-meta">${s.cliff_passed ? 'cliff passed' : 'in cliff'} · vested $${s.vested_usd} of $${s.total_usd} · released $${s.released_usd}</div>
+      </div>
+      <div class="vest-act">
+        <div class="vest-amt">$${s.releasable_usd}<span class="sub">releasable</span></div>
+        <button class="vest-release-btn" data-name="${esc(s.name)}">Release ↗</button>
+      </div>
+    </div>`).join('');
+  el('vesting-body').querySelectorAll('.vest-release-btn').forEach(b =>
+    b.onclick = () => sendMessage(`Release ${b.dataset.name}'s vested pay`)
+  );
+}
+
 async function load() {
   try {
-    const [health, employees, audit, treasury, policy] = await Promise.all([
+    const [health, employees, audit, treasury, policy, balances, vesting] = await Promise.all([
       fetch('/api/health').then(r => r.json()),
       fetch('/api/employees').then(r => r.json()),
       fetch('/api/audit').then(r => r.json()),
       fetch('/api/treasury').then(r => r.json()).catch(() => null),
       fetch('/api/policy').then(r => r.json()).catch(() => null),
+      fetch('/api/team-balances').then(r => r.json()).catch(() => ({})),
+      fetch('/api/vesting').then(r => r.json()).catch(() => null),
     ]);
     setStatus(health.ok ? 'Arc testnet · live' : 'degraded', health.ok ? 'live' : 'err');
     renderPolicy(policy);
@@ -375,11 +443,11 @@ async function load() {
       : '';
     const addr = treasury?.treasury_address;
     el('treasury-links').innerHTML = [
-      addr ? `<a href="${ARCSCAN}/address/${addr}" target="_blank" rel="noopener" title="${addr}">Treasury wallet&nbsp;↗</a>` : '',
-      `<a href="${ARCSCAN}/address/${VAULT_ADDRESS}" target="_blank" rel="noopener" title="${VAULT_ADDRESS}">Vesting vault&nbsp;↗</a>`,
+      addr ? `<a href="${ARCSCAN}/address/${addr}" target="_blank" rel="noopener" title="Dynamic MPC server wallet — signs every payment and vault release. Holds no payroll funds (the seal pool is private), so the explorer shows ~$0 by design. ${addr}">Dynamic signer&nbsp;↗</a>` : '',
     ].filter(Boolean).join('');
 
-    renderRoster(employees);
+    renderRoster(employees, balances);
+    renderVesting(vesting);
 
     const empName = {};
     employees.forEach(e => { empName[e.id] = e.name; });
@@ -555,6 +623,15 @@ el('chips').addEventListener('click', (e) => { const chip = e.target.closest('.c
 el('manage-toggle').addEventListener('click', () => { manageMode = !manageMode; load(); });
 el('ae-add').addEventListener('click', addEmployee);
 el('policy-edit').addEventListener('click', () => { policyEdit = !policyEdit; load(); });
+
+el('reset-demo').addEventListener('click', async () => {
+  if (!confirm("Reset the demo? Clears today's payroll runs, payments, and the audit log. The team and controls stay. (On-chain balances are real and remain.)")) return;
+  const btn = el('reset-demo'); btn.disabled = true; btn.textContent = '…';
+  try { await fetch('/api/reset', { method: 'POST' }); } catch {}
+  el('chat-log').innerHTML = '<div class="placeholder">Tell the agent to run today\'s payroll. It drafts the run, checks policy, and seals it — or holds for approval, or refuses.</div>';
+  btn.disabled = false; btn.textContent = '↺ Reset demo';
+  await load();
+});
 
 load();
 </script>
