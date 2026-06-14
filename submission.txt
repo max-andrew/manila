@@ -1,29 +1,214 @@
+MANILA — confidential, AI-agent-operated payroll on Arc
+The pay envelope, rebuilt onchain.
+
+Live:  https://manila.maxwell-andrew.workers.dev
+Repo:  https://github.com/max-andrew/manila
+Built solo at ETHGlobal New York 2026.
+
+
+====================================================================
 SHORT DESCRIPTION
+====================================================================
+AI-agent payroll on Arc: confidential daily USDC salaries + oracle-priced equity vesting.
 
-AI-agent payroll: confidential daily USDC salaries + programmable on-chain vesting, on Arc.
 
-
+====================================================================
 DESCRIPTION
+====================================================================
+Manila is confidential USDC payroll, operated by an AI agent. Today under 1% of
+payroll runs on stablecoins, partly because a public chain turns every salary
+into a permanent, public record. Manila fixes that and pays the team daily
+instead of monthly.
 
-Manila is confidential USDC payroll, operated by an AI agent. Today under 1% of payroll runs on stablecoins, partly because a public chain turns every salary into a permanent, public record. Manila fixes that and pays the team daily instead of monthly.
-
-You instruct an agent in plain English — "run today's payroll," "pay just Ben Strauss," "run with the maximally acceptable bonus." The agent drafts the run, but it can't act on vibes: every run is checked against a deterministic policy engine (per-run cap, hard ceiling, pay band, recipient allowlist) that returns one of three verdicts — pass, hold for a second human signature, or refuse. The model proposes; deterministic code disposes, so no clever prompt can talk a payment past the controls.
+You instruct an agent in plain English — "run today's payroll," "pay just Ben
+Strauss," "run with the maximally acceptable bonus." The agent drafts the run,
+but it can't act on vibes: every run is checked against a deterministic policy
+engine (per-run cap, hard ceiling, pay band, recipient allowlist) that returns
+one of three verdicts — pass, hold for a second human signature, or refuse. The
+model proposes; deterministic code disposes, so no clever prompt can talk a
+payment past the controls.
 
 Manila runs two USDC rails:
 
-1. Sealed daily salary — each salary is sent as a private transfer, settled through gas-free batched nanopayments, so per-day payroll costs a fraction of a cent (impractical on ACH or wire). Balances are sealed from the public explorer but remain auditable to the employer.
+1. Sealed daily salary — each salary is sent as a private transfer, settled
+   through gas-free batched nanopayments, so per-day payroll costs a fraction of
+   a cent (impractical on ACH or wire). Balances are sealed from the public
+   explorer but remain auditable to the employer.
 
-2. Programmable equity — RSU grants vest on-chain (cliff + linear). On release, the smart contract reads a live company share price from an on-chain oracle and pays the vested shares' value in USDC — equity that tracks the real stock but settles in stablecoin. This path is fully public and verifiable on Arc; the agent releases each tranche, signed by the Dynamic wallet.
+2. Programmable equity — RSU grants vest on-chain (cliff + linear). On release,
+   the smart contract reads a live company share price from an on-chain oracle
+   and pays the vested shares' value in USDC — equity that tracks the real stock
+   but settles in stablecoin. Fully public and verifiable on Arc; the agent
+   releases each tranche, signed by the Dynamic wallet.
 
-Every action — drafts, policy checks, seals, vault releases — lands in an exportable audit trail. The agent holds no private keys: every payment is signed by a Dynamic MPC server wallet.
+Every action — drafts, policy checks, seals, vault releases — lands in an
+exportable audit trail. The agent holds no private keys: every payment is signed
+by a Dynamic MPC server wallet.
 
 
+====================================================================
 HOW IT'S MADE
+====================================================================
+The whole app is a Cloudflare Worker (Hono router, D1/SQLite for state, served
+from one static page). The agent brain is Cloudflare Workers AI running Llama
+3.3 70B in a function-calling loop — no external LLM key, the model runs on the
+AI binding. The model only routes: it picks tools (draft run, check policy,
+execute, request approval, release vesting), and a deterministic policy engine
+makes every money decision, so a smaller free model can't be talked past the
+controls. A deterministic fallback parser handles cases where the model emits no
+clean tool call, so commands never fail or echo garbage.
 
-The whole app is a Cloudflare Worker (Hono router, D1/SQLite for state, served from one static page). The agent brain is Cloudflare Workers AI running Llama 3.3 70B in a function-calling loop — no external LLM key, the model runs on the AI binding. The model only routes: it picks tools (draft run, check policy, execute, request approval, release vesting), and a deterministic policy engine makes every money decision, so a smaller free model can't be talked past the controls. A deterministic fallback parser handles cases where the model emits no clean tool call, so commands never fail or echo garbage.
+Circle / Arc: everything settles in USDC on Arc testnet, where USDC is the
+native gas token. Payroll fees settle as batched x402 nanopayments through Circle
+Gateway. The equity-vesting path is a Solidity contract (PayrollVaultV3, Foundry-
+tested, 20 tests) deployed on Arc for the Advanced Stablecoin Logic track: it
+vests RSU shares and, on release, reads a live AAPL/USD price from an on-chain
+oracle and pays the vested shares' value in USDC — multi-step settlement (oracle
+read -> share-to-USDC conversion -> transfer), plus resetClock (re-arm) and
+topUp. The oracle is the standard Pyth IPyth interface; on Arc we deploy a
+PythPriceRelay fed real prices from Pyth's free Hermes feed, so it's a drop-in
+for canonical Pyth.
 
-Circle / Arc: everything settles in USDC on Arc testnet, where USDC is the native gas token. Payroll fees settle as batched x402 nanopayments through Circle Gateway. The equity-vesting path is a Solidity contract (PayrollVaultV3, Foundry-tested, 20 tests) deployed on Arc for the "Advanced Stablecoin Logic" track: it vests RSU shares and, on release, reads a live AAPL/USD price from an on-chain oracle and pays the vested shares' value in USDC — multi-step settlement (oracle read → share-to-USDC conversion → transfer), plus resetClock (re-arm) and topUp. The oracle is the standard Pyth IPyth interface; on Arc we deploy a PythPriceRelay fed real prices from Pyth's free Hermes feed, so it's a drop-in for canonical Pyth.
+Unlink: salaries are sealed as private transfers via the Unlink SDK; the public
+explorer can't show them (the point), so the employer reads auditable balances
+through Unlink's admin API.
 
-Unlink: salaries are sealed as private transfers via the Unlink SDK; the public explorer can't show them (the point), so we read employer-auditable balances through Unlink's admin API.
+Dynamic: the agent holds no keys. A Dynamic MPC (2-of-2) server wallet signs
+every x402 authorization and every on-chain vault release. Because the native
+MPC binary can't run inside workerd, a tiny Node sidecar exposes signing only —
+the Worker builds the transaction, the sidecar signs, the Worker broadcasts. The
+Dynamic wallet is also the vault's on-chain releaser, so "the agent released
+vested equity, signed by Dynamic, settled on Arc" is literally true on-chain.
 
-Dynamic: the agent holds no keys. A Dynamic MPC (2-of-2) server wallet signs every x402 authorization and every on-chain vault release. Because the native MPC binary can't run inside workerd, the hacky-but-clean bit is a tiny Node sidecar that exposes signing only — the Worker builds the transaction, the sidecar signs, the Worker broadcasts. The Dynamic wallet is also the vault's on-chain releaser, so "the agent released vested USDC, signed by Dynamic, settled on Arc" is literally true on-chain.
+Architecture diagrams: docs/ARCHITECTURE.md (system + the oracle/RSU flow).
+
+
+====================================================================
+PRIZES & SPONSOR INTEGRATIONS
+====================================================================
+For each sponsor: which prizes we're applying for and why, the clearest line of
+code where the tech is used, API ease of use (1-10), and feedback.
+
+
+--------------------------------------------------------------------
+DYNAMIC
+--------------------------------------------------------------------
+Applying for:
+  - Best Agentic Build
+  - Best Money App
+  - Best Private Nanopayments (joint with Unlink + Arc)
+
+Why we're applicable:
+  The AI agent decides AND executes payroll on-chain, signing every settlement
+  authorization and every vault release with a Dynamic MPC server wallet — it
+  holds no key material, and a deterministic policy gate bounds what it can sign
+  (Best Agentic Build). It's a deployed, real money-movement product — private
+  USDC payroll plus oracle-priced equity vesting, with maker-checker controls
+  and an audit trail (Best Money App). And the Dynamic wallet is the wallet
+  layer that creates the account and signs every private nanopayment (joint).
+
+Where the tech is used (clearest example):
+  The server wallet signs each transaction the agent broadcasts (the agent never
+  holds a key):
+  https://github.com/max-andrew/manila/blob/main/sidecar/server.mjs#L136
+  Stateless wallet creation (MPC, backed up to Dynamic):
+  https://github.com/max-andrew/manila/blob/main/sidecar/server.mjs#L80
+
+API ease of use: 7/10
+  Clean api-token + environment-id flow, and signTypedData accepting arbitrary
+  EIP-712 is what let one wallet sign Circle's x402 batch authorizations — that
+  composability is why the project works. Docked for the native-binary runtime
+  constraint (below).
+
+Feedback:
+  - @dynamic-labs-wallet/node-evm ships a native .node MPC binary, so it can't
+    load in Cloudflare Workers (or any edge/V8-isolate runtime). We confirmed by
+    probing workerd, then ran a Node sidecar just for signing. A "runtime: Node
+    only, native binary" note near the top of the server-wallet docs would save
+    an hour.
+  - A transitive dep (tslib, via @zerodev/ecdsa-validator) wasn't hoisted, so
+    the sidecar crashed first run with "Cannot find module 'tslib'".
+  - getWallets() logs a deprecation warning pointing to getWalletByAddress(),
+    but the wallet-recovery example still uses getWallets().
+
+
+--------------------------------------------------------------------
+UNLINK
+--------------------------------------------------------------------
+Applying for:
+  - Best Private Nanopayments (joint with Dynamic + Arc)
+
+Why we're applicable:
+  Every salary is sealed as a private Unlink transfer between unlink1 accounts,
+  which hides amount, sender, recipient, and token on the public explorer — only
+  an opaque privacy-pool interaction is visible. Private payroll is the product's
+  whole reason to exist; remove Unlink and salaries are public.
+
+Where the tech is used (clearest example):
+  One sealed salary transfer:
+  https://github.com/max-andrew/manila/blob/main/src/lib/unlink.ts#L71
+  Offline private-account provisioning for a new hire:
+  https://github.com/max-andrew/manila/blob/main/src/lib/unlink.ts#L39
+
+API ease of use: 6/10
+  The core is clean — offline account derivation needs no key or network, and
+  transfer() returning { txId, status, txHash } is exactly right. Docked mostly
+  for testnet token/faucet discovery friction (below).
+
+Feedback:
+  - The faucet token was the biggest time sink: on arc-testnet the pool settles
+    mock tokens (ULNKm/USDCm), not native USDC — but passing the native USDC
+    address returns only "invalid token: token not supported by faucet" with no
+    hint of what IS supported, and env-info exposes no token list. A supported-
+    token list in env-info (or the error) would fix this instantly.
+  - USDCm is 18 decimals, not 6 like real USDC — surprising for a USD stand-in
+    and easy to get silently wrong in amount math.
+  - The /admin entry maps to null under the "browser" export condition, so
+    wrangler/esbuild fail with "Could not resolve @unlink-xyz/sdk/admin"; we
+    added a wrangler alias. A node/worker export condition would remove this.
+  - The @canary install-tag requirement isn't obvious from the package page.
+
+
+--------------------------------------------------------------------
+ARC / CIRCLE
+--------------------------------------------------------------------
+Applying for:
+  - Best Smart Contracts on Arc (Advanced Stablecoin Logic)
+  - Best Agentic Economy with the Circle Agent Stack
+  - Best Private Nanopayments (joint with Dynamic + Unlink)
+
+Why we're applicable:
+  PayrollVaultV3 is advanced stablecoin logic: it reads a live company share
+  price from an on-chain oracle and settles vested RSU shares in USDC — multi-
+  step settlement (oracle read -> conversion -> transfer), plus resetClock and
+  topUp, 20 passing tests (Best Smart Contracts). The agent pays a per-
+  disbursement x402 nanopayment netted by Circle Gateway into one gas-free
+  settlement — agent-to-service commerce on Arc (Agentic Economy). USDC is the
+  settlement and native gas asset throughout (joint).
+
+Where the tech is used (clearest example):
+  Circle Gateway / x402 settlement of a disbursement:
+  https://github.com/max-andrew/manila/blob/main/src/routes/seal.ts#L153
+  The Dynamic wallet signing the batched Gateway authorization:
+  https://github.com/max-andrew/manila/blob/main/src/routes/disburse.ts#L47
+  Arc testnet chain (USDC as native gas):
+  https://github.com/max-andrew/manila/blob/main/src/lib/arc.ts#L10
+  The contract reading the oracle and converting shares -> USDC:
+  https://github.com/max-andrew/manila/blob/main/contracts/src/PayrollVaultV3.sol#L129
+
+API ease of use: 8/10
+  The x402 buyer needs no API key — just an EOA — which is excellent DX;
+  getSupported() advertising each network's verifyingContract + assets made the
+  seal endpoint self-configuring; depositFor() funded the MPC wallet's Gateway
+  balance from a separate EOA cleanly; native USDC gas on Arc just worked.
+
+Feedback:
+  - @circle-fin/x402-batching's seller side is Express-shaped ((req, res, next)
+    middleware). Porting to Hono on Workers meant reading source for the exact
+    header names (PAYMENT-REQUIRED / payment-signature / PAYMENT-RESPONSE) and
+    the base64-JSON envelope. A framework-agnostic core (verify/settle given a
+    payload + requirements) would make non-Express integrations much easier.
+  - The USDC asset lives at kind.extra.assets[].address (find by symbol); easy
+    to read the wrong field without an example.
+  - The Arc faucet's 20 USDC / 2h / address limit is tight when provisioning
+    several wallets for one demo.
