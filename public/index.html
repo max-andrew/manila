@@ -84,8 +84,8 @@
   .msg.agent { align-self: flex-start; background: var(--paper); border: 1px solid var(--line); font-family: var(--mono); font-size: .8rem; border-bottom-left-radius: 2px; }
   .msg.agent.think { color: var(--khaki); font-style: italic; }
   .placeholder { color: var(--khaki); font-size: .85rem; }
-  .chips { display: flex; flex-wrap: wrap; gap: .4rem; margin: 1rem 0 .7rem; }
-  .chip { font-family: var(--mono); font-size: .7rem; color: var(--khaki); background: #fff; border: 1px solid var(--line); border-radius: 999px; padding: .28rem .65rem; cursor: pointer; }
+  .chips { display: flex; flex-wrap: nowrap; gap: .4rem; margin: 1rem 0 .7rem; overflow-x: auto; scrollbar-width: thin; -webkit-overflow-scrolling: touch; padding-bottom: .15rem; }
+  .chip { font-family: var(--mono); font-size: .7rem; color: var(--khaki); background: #fff; border: 1px solid var(--line); border-radius: 999px; padding: .28rem .65rem; cursor: pointer; white-space: nowrap; flex: 0 0 auto; }
   .chip:hover { border-color: var(--ink); color: var(--ink); }
   #chat-form { display: flex; gap: .5rem; }
   #chat-input { flex: 1; font-family: var(--mono); font-size: .82rem; padding: .55rem .7rem; border: 1px solid var(--ink); border-radius: 7px; background: #fff; color: var(--ink); }
@@ -161,10 +161,12 @@
   .signer-desc { font-size: .74rem; color: var(--khaki); flex-basis: 100%; line-height: 1.5; margin-top: .1rem; }
   .signer-switch { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; flex-basis: 100%; margin-top: .7rem; padding-top: .7rem; border-top: 1px solid var(--line); }
   .signer-switch .eyebrow { flex-basis: 100%; }
-  .wallet-pill { font-family: var(--mono); font-size: .68rem; color: var(--khaki); border: 1px solid var(--line); border-radius: 999px; padding: .25rem .6rem; background: none; cursor: pointer; }
-  .wallet-pill:hover { color: var(--ink); border-color: var(--khaki); }
-  .wallet-pill.active { color: var(--ink); border-color: var(--manila); background: #fbf5e9; cursor: default; }
-  .wallet-pill.provision { border-style: dashed; }
+  .wallet-pill { font-family: var(--mono); font-size: .68rem; color: var(--khaki); border: 1px solid var(--line); border-radius: 999px; padding: .25rem .6rem; background: none; text-decoration: none; }
+  a.wallet-pill:hover { color: var(--ink); border-color: var(--khaki); }
+  .wallet-pill.active { color: var(--ink); border-color: var(--manila); background: #fbf5e9; }
+  .signer-rotate { flex-basis: 100%; font-size: .68rem; color: var(--khaki); margin-top: .35rem; line-height: 1.5; }
+  .signer-rotate a { color: var(--khaki); }
+  .signer-rotate a:hover { color: var(--ink); }
   .badge.off { color: var(--stamp); border-color: #e7c9c4; background: #fbeeec; }
 
   /* team roster */
@@ -283,6 +285,7 @@
         <span class="chip" data-msg="Run today's payroll">Run today's payroll</span>
         <span class="chip" data-msg="Pay Ben Strauss">Pay Ben Strauss</span>
         <span class="chip" data-msg="Run today's payroll with the maximally acceptable bonus">Run with the maximally acceptable bonus</span>
+        <span class="chip" data-msg="Run today's payroll with a 500% bonus">Run with a 500% bonus</span>
         <span class="chip" data-msg="Send today's pay to 0x000000000000000000000000000000000000dEaD">Pay a random wallet</span>
       </div>
       <form id="chat-form" autocomplete="off">
@@ -418,7 +421,7 @@ function renderSigner(s) {
     badge.textContent = 'offline'; badge.className = 'badge off';
     body.innerHTML = active
       ? `<a class="signer-addr" href="${ARCSCAN}/address/${active}" target="_blank" rel="noopener">${short(active)}&nbsp;↗</a>
-         <span class="signer-desc">MPC 2-of-2 server wallet — signs every payment and vault release; the agent holds no keys. Signer is offline now; start <b>judge-mode</b> to sign live.</span>`
+         <span class="signer-desc">Dynamic MPC 2-of-2 server wallet — signs every payment and vault release; the agent holds no keys. Signer is offline now; start <b>judge-mode</b> to sign live.</span>`
       : '<span class="signer-desc">Signer offline — start judge-mode.</span>';
     return;
   }
@@ -426,30 +429,17 @@ function renderSigner(s) {
   const wallets = s.wallets || [];
   const pills = wallets.map(w =>
     w.active
-      ? `<span class="wallet-pill active" title="active signer">${short(w.address)} ✓</span>`
-      : `<button class="wallet-pill" data-addr="${w.address}" title="switch the active signer to this wallet">${short(w.address)}</button>`
+      ? `<span class="wallet-pill active" title="active signer">${short(w.address)} ✓ active</span>`
+      : `<a class="wallet-pill" href="${ARCSCAN}/address/${w.address}" target="_blank" rel="noopener" title="${w.address}">${short(w.address)}</a>`
   ).join('');
   body.innerHTML = `
     <a class="signer-addr" href="${ARCSCAN}/address/${active}" target="_blank" rel="noopener" title="${active}">${short(active)}&nbsp;↗</a>
-    <span class="signer-desc">Dynamic MPC <b>2-of-2</b> server wallet — signs every payment and vault release; the agent holds no keys. Switching the signer changes who signs; only a wallet funded in Gateway and set as the vault releaser can settle — that's the security boundary.</span>
+    <span class="signer-desc">Dynamic MPC <b>2-of-2</b> server wallet — signs every payment and vault release; the agent holds no keys. The signing set is a Dynamic team, not a hardcoded key.</span>
     <div class="signer-switch">
-      <span class="eyebrow">Switch signer</span>
+      <span class="eyebrow">Signing set</span>
       ${pills}
-      <button class="wallet-pill provision" id="signer-provision" title="provision a fresh Dynamic MPC wallet">+ new wallet</button>
+      <span class="signer-rotate">Rotating signers is a treasury operation — <a href="mailto:hello@manila.xyz?subject=Onboard%20Dynamic%20signing%20team">contact us</a> to onboard your Dynamic wallets as a new signing team.</span>
     </div>`;
-  body.querySelectorAll('.wallet-pill[data-addr]').forEach(b => b.onclick = () => switchSigner(b.dataset.addr, b));
-  const prov = el('signer-provision');
-  if (prov) prov.onclick = () => provisionSigner(prov);
-}
-async function switchSigner(address, btn) {
-  btn.disabled = true; btn.textContent = 'switching…';
-  try { await fetch('/api/signer/select', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ address }) }); } catch {}
-  await load();
-}
-async function provisionSigner(btn) {
-  btn.disabled = true; btn.textContent = 'creating…';
-  try { await fetch('/api/signer/provision', { method: 'POST' }); } catch {}
-  await load();
 }
 
 function renderVesting(v) {
