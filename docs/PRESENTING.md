@@ -12,7 +12,7 @@ Everything you need to demo, pitch, and defend the project. Keep this open durin
 bash scripts/judge-mode.sh     # starts the Dynamic signing sidecar + tunnel; deployed site can now sign live. Leave it open.
 node scripts/oracle-push.mjs   # post a fresh AAPL price to the on-chain oracle (so the equity card is live)
 ```
-- Open **https://manila.maxwell-andrew.workers.dev** in one tab, **ArcScan** (testnet.arcscan.app) in another.
+- Open **https://manila.maxwellandrew.com** in one tab, **ArcScan** (testnet.arcscan.app) in another.
 - Sanity check: status dot green ("Arc testnet · live"); the **Dynamic server wallet** card shows **online**; the **Equity vesting** card shows a pulsing **AAPL** price; the **Equity vesting** card has a non-zero "releasable" (if not, click **↻ Reset clock** once).
 - Keep one **already-sealed tx hash** in your back pocket as a fallback (§4).
 - Click **↺ Reset demo** (footer) so you start with "not run today" — the run-status and "✓ paid today" tags then tell a clean story.

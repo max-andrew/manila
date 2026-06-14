@@ -12,7 +12,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-WORKER_URL="https://manila.maxwell-andrew.workers.dev"
+WORKER_URL="https://manila.maxwellandrew.com"
 SECRET=$(grep '^SIGNER_SIDECAR_SECRET=' .dev.vars | cut -d= -f2)
 
 # 1. sidecar (Dynamic MPC signer) — restart fresh so the Dynamic token is new

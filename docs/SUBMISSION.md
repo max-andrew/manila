@@ -2,7 +2,7 @@
 
 *The pay envelope, rebuilt onchain.*
 
-**Live:** https://manila.maxwell-andrew.workers.dev · **Repo:** https://github.com/max-andrew/manila
+**Live:** https://manila.maxwellandrew.com · **Repo:** https://github.com/max-andrew/manila
 
 Confidential, AI-agent-operated payroll in USDC on Arc. An employer funds a treasury; an AI agent drafts and executes payroll runs from plain-English commands; a policy engine (per-run cap + recipient allowlist) gates every run, with over-threshold runs halting for human approval — two signatures on the envelope. Disbursements settle as batched, gas-free USDC nanopayments on Arc via Circle Gateway, sealed by Unlink so amounts and counterparties stay confidential, and the employer keeps a full exportable audit trail. Salaries on a public chain are the documented blocker to stablecoin payroll adoption (<1%); Manila is the fix: public confidentiality, private auditability.
 

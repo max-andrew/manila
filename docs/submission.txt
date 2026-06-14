@@ -1,5 +1,5 @@
 MANILA — prize submission answers
-Live: https://manila.maxwell-andrew.workers.dev   Repo: https://github.com/max-andrew/manila
+Live: https://manila.maxwellandrew.com   Repo: https://github.com/max-andrew/manila
 
 Per sponsor: the prizes we're applying for and why, the clearest line of code where the tech is used, API ease of use (1-10), and feedback.
 
