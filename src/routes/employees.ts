@@ -4,11 +4,42 @@
 
 import { Hono } from 'hono';
 import { privateKeyToAccount, generatePrivateKey } from 'viem/accounts';
-import { provisionRecipient } from '../lib/unlink';
+import { provisionRecipient, unlinkAdmin } from '../lib/unlink';
+import { ARC_USDC_ADDRESS } from '../lib/arc';
 import { audit } from '../lib/audit';
 import type { Env } from '../env';
 
 export const employeesApp = new Hono<{ Bindings: Env }>();
+
+// Each employee's private (sealed) balance — readable by the employer via the
+// Unlink admin handle, but NOT on the public explorer. This is the auditable
+// side of the privacy split: proof the money landed, visible only to the
+// employer. Returns { [employeeId]: formattedUSD | null }.
+employeesApp.get('/team-balances', async (c) => {
+  const env = c.env;
+  const { results } = await env.DB.prepare(
+    'SELECT id, unlink_address FROM employees WHERE unlink_address IS NOT NULL'
+  ).all<{ id: number; unlink_address: string }>();
+  const token = (env.UNLINK_TOKEN_ADDRESS || ARC_USDC_ADDRESS).toLowerCase();
+  const decimals = Number(env.UNLINK_TOKEN_DECIMALS || '6');
+  const admin = unlinkAdmin(env);
+
+  const out: Record<number, string | null> = {};
+  await Promise.all(
+    results.map(async (e) => {
+      try {
+        const data: any = await admin.users.getBalances({ address: e.unlink_address });
+        const entry = (data?.balances as Array<{ token: string; amount: string }> | undefined)?.find(
+          (b) => b.token.toLowerCase() === token
+        );
+        out[e.id] = entry ? (Number(entry.amount) / 10 ** decimals).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00';
+      } catch {
+        out[e.id] = null;
+      }
+    })
+  );
+  return c.json(out);
+});
 
 async function setAllowlist(env: Env, mutate: (list: string[]) => string[]) {
   const row = await env.DB.prepare('SELECT allowlist FROM policies WHERE id = 1').first<{ allowlist: string }>();

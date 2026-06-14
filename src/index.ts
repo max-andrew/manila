@@ -7,10 +7,22 @@ import { statusApp } from './routes/status';
 import { treasuryApp } from './routes/treasury';
 import { employeesApp } from './routes/employees';
 import { policyApp } from './routes/policy';
+import { vestingApp } from './routes/vesting';
 
 const app = new Hono<{ Bindings: Env }>();
 
 app.get('/api/health', (c) => c.json({ ok: true, service: 'manila' }));
+
+// Reset the demo: clear the day's runs, payments, and audit (team + controls
+// stay). After this, nobody is "paid today" — start a fresh walkthrough.
+app.post('/api/reset', async (c) => {
+  await c.env.DB.batch([
+    c.env.DB.prepare('DELETE FROM payments'),
+    c.env.DB.prepare('DELETE FROM payroll_runs'),
+    c.env.DB.prepare('DELETE FROM audit_log'),
+  ]);
+  return c.json({ reset: true });
+});
 
 app.get('/api/audit', async (c) => {
   const { results } = await c.env.DB.prepare(
@@ -26,6 +38,7 @@ app.route('/api', statusApp);
 app.route('/api', treasuryApp);
 app.route('/api', employeesApp);
 app.route('/api', policyApp);
+app.route('/api', vestingApp);
 
 app.onError((err, c) => {
   console.error(err);
