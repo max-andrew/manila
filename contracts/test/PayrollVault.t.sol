@@ -89,4 +89,50 @@ contract PayrollVaultTest is Test {
         vm.expectRevert("not authorized");
         vault.release(alice);
     }
+
+    // At the cliff, the whole amount accrued from start unlocks at once
+    // (standard cliff vesting), then it continues linearly.
+    function testCliffUnlocksAccruedChunkAtOnce() public {
+        uint256 t0 = block.timestamp;
+        _schedule(); // cliff at +50, duration 100
+        vm.warp(t0 + 49);
+        assertEq(vault.releasable(alice), 0); // nothing before the cliff
+        vm.warp(t0 + 50);
+        assertEq(vault.releasable(alice), 500_000); // 50% unlocks in one step
+    }
+
+    function testCannotCreateScheduleTwice() public {
+        _schedule();
+        vm.expectRevert("schedule exists");
+        _schedule();
+    }
+
+    function testOnlyEmployerCreates() public {
+        vm.prank(address(0xBAD));
+        vm.expectRevert("not employer");
+        vault.createSchedule(alice, 1_000_000, uint64(block.timestamp), uint64(block.timestamp), 100);
+    }
+
+    function testReleaserRotation() public {
+        uint256 t0 = block.timestamp;
+        _schedule();
+        vm.warp(t0 + 200);
+
+        address newAgent = address(0xBEEF);
+        vault.setReleaser(newAgent);
+
+        // The old releaser is no longer authorized; the new one is.
+        vm.prank(agent);
+        vm.expectRevert("not authorized");
+        vault.release(alice);
+        vm.prank(newAgent);
+        vault.release(alice);
+        assertEq(usdc.balanceOf(alice), 1_000_000);
+    }
+
+    function testOnlyEmployerSetsReleaser() public {
+        vm.prank(address(0xBAD));
+        vm.expectRevert("not employer");
+        vault.setReleaser(address(0xBEEF));
+    }
 }

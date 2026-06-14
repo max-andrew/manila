@@ -19,7 +19,9 @@ The main disbursement path seals salaries privately via Unlink. The vault is the
 ```sh
 cd contracts
 forge install foundry-rs/forge-std   # first time
-forge test                            # cliff, linear, no-double-release, authorization
+forge test                            # 9 tests: cliff gating + chunk-unlock, linear vest,
+                                      # no-double-release, authorization, employer-only
+                                      # createSchedule/setReleaser, releaser rotation
 
 # deploy
 forge create src/PayrollVault.sol:PayrollVault --rpc-url https://rpc.testnet.arc.network \
