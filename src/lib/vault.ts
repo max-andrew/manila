@@ -193,10 +193,10 @@ export async function resetVestingClock(env: Env, beneficiary: string): Promise<
   if (!exists) return { reset: false, beneficiary, error: 'no schedule for this beneficiary' };
   if (total - released === 0n) return { reset: false, beneficiary, error: 'fully released — nothing left to re-arm' };
 
-  // Re-arm over a short, demo-paced clock: the remaining funds stream over ~10
-  // minutes, so releasable visibly grows (a judge sees it tick up), the cliff is
-  // already passed, and there's plenty of headroom before it fully vests.
-  const dur = 600;
+  // Re-arm over a demo-paced clock: the remaining funds stream over ~30
+  // minutes, so releasable keeps growing (visible via the live poll), the cliff
+  // is already passed, and it stays well short of fully vesting during a demo.
+  const dur = 1800;
   const now = Math.floor(Date.now() / 1000);
   const start = BigInt(now - Math.floor(dur / 8)); // ~12.5% vested immediately
   const data = encodeFunctionData({
