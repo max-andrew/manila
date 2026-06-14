@@ -599,7 +599,7 @@ function sentenceCase(s: string): string {
 
 function vestingReply(v: ToolResult): string {
   const name = String(v.name ?? 'the beneficiary');
-  if (v.released) return `released ${v.amount_usd} of vested USDC to ${name} on-chain, signed by the dynamic wallet.`;
+  if (v.released) return `released ${name}'s vested equity, worth ${v.amount_usd}, settled in USDC on-chain — signed by the dynamic wallet.`;
   return `couldn't release for ${name} — ${v.error ?? 'no vested amount available'}.`;
 }
 
