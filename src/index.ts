@@ -9,6 +9,7 @@ import { employeesApp } from './routes/employees';
 import { policyApp } from './routes/policy';
 import { vestingApp } from './routes/vesting';
 import { signerApp } from './routes/signer';
+import { sidecarHealth } from './lib/signer';
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -45,4 +46,18 @@ app.onError((err, c) => {
   return c.json({ error: err.message }, 500);
 });
 
-export default app;
+export default {
+  fetch: app.fetch,
+  // Autowake: a Cron Trigger pings the signer sidecar's /health so it never
+  // goes cold between demos — and a free, sleep-on-idle host (e.g. Render) stays
+  // awake. Pure health check: no signing, no state, just visibility if it's down.
+  async scheduled(_event: ScheduledController, env: Env, ctx: ExecutionContext) {
+    if (!env.SIGNER_SIDECAR_URL) return;
+    ctx.waitUntil(
+      sidecarHealth(env).then(
+        (h) => console.log(`autowake: sidecar ok (${h.address})`),
+        (e) => console.warn(`autowake: sidecar unreachable: ${e?.message ?? e}`)
+      )
+    );
+  },
+};

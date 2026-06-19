@@ -43,7 +43,9 @@ const DYNAMIC_API_KEY = need('DYNAMIC_API_KEY');
 const DYNAMIC_ENV_ID = need('DYNAMIC_ENV_ID');
 const WALLET_PASSWORD = need('SIDECAR_WALLET_PASSWORD');
 const SIDECAR_SECRET = need('SIGNER_SIDECAR_SECRET');
-const PORT = Number(vars.SIDECAR_PORT ?? 8901);
+// Railway (and most PaaS hosts) inject the public port as PORT; locally we use
+// SIDECAR_PORT from .dev.vars. Honor PORT first so the host's URL routes in.
+const PORT = Number(vars.PORT ?? vars.SIDECAR_PORT ?? 8901);
 const WALLET_FILE = join(here, '.wallet.json');
 
 // --- Dynamic client -------------------------------------------------------

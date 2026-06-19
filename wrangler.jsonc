@@ -25,5 +25,8 @@
       "migrations_dir": "./migrations"
     }
   ],
-  "observability": { "enabled": true }
+  "observability": { "enabled": true },
+  // Autowake: ping the signer sidecar every 5 min so it never goes cold between
+  // demos (handler in src/index.ts). Cron Triggers are free-tier.
+  "triggers": { "crons": ["*/5 * * * *"] }
 }
