@@ -5,8 +5,17 @@
 
 import type { Env } from '../env';
 
+// The signer lives in a single Cloudflare Container instance (the MPC session
+// isn't concurrency-safe), always addressed by the same name. The stub's fetch
+// invokes Container.fetch, which auto-starts the container if it's asleep and
+// waits for its port before resolving — so a cold signer adds latency, never an
+// error. The shared secret is still sent as defense-in-depth.
+function signerStub(env: Env) {
+  return env.SIGNER.get(env.SIGNER.idFromName('signer'));
+}
+
 async function sidecar<T>(env: Env, path: string, body: unknown): Promise<T> {
-  const res = await fetch(`${env.SIGNER_SIDECAR_URL}${path}`, {
+  const res = await signerStub(env).fetch(`http://signer${path}`, {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
@@ -25,7 +34,7 @@ async function sidecar<T>(env: Env, path: string, body: unknown): Promise<T> {
 }
 
 export async function sidecarHealth(env: Env): Promise<{ ok: boolean; address: string }> {
-  const res = await fetch(`${env.SIGNER_SIDECAR_URL}/health`, {
+  const res = await signerStub(env).fetch('http://signer/health', {
     headers: { 'x-sidecar-secret': env.SIGNER_SIDECAR_SECRET },
   });
   if (!res.ok) throw new Error(`sidecar health -> ${res.status}`);

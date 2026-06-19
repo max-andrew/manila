@@ -18,7 +18,10 @@ export type Env = {
   TREASURY_WALLET_ADDRESS: string;
   // Platform fee collector for the $0.001-per-disbursement x402 nanopayments:
   SEAL_FEE_ADDRESS: string;
-  // Node sidecar that holds the Dynamic MPC SDK (native binary, can't run in workerd):
-  SIGNER_SIDECAR_URL: string;
+  // The Dynamic MPC signer runs in a Cloudflare Container (native binary can't
+  // run in workerd) reached through this Durable Object binding — see
+  // signer-container.ts. The Worker forwards the secrets to the container.
+  SIGNER: DurableObjectNamespace<import('./signer-container').SignerContainer>;
   SIGNER_SIDECAR_SECRET: string;
+  SIDECAR_WALLET_PASSWORD: string;
 };

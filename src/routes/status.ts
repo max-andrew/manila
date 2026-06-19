@@ -35,12 +35,12 @@ statusApp.get('/status', async (c) => {
     dynamic_key: !!env.DYNAMIC_API_KEY,
     unlink_key: !!env.UNLINK_API_KEY,
     treasury_unlink_mnemonic: !!env.TREASURY_UNLINK_MNEMONIC,
-    sidecar_url: !!env.SIGNER_SIDECAR_URL,
+    signer_secret: !!env.SIGNER_SIDECAR_SECRET,
   };
 
-  // Is the Dynamic signing sidecar reachable?
+  // Is the Dynamic signing container reachable? This wakes it if it's asleep.
   let sidecar: Record<string, unknown> = { configured: false };
-  if (env.SIGNER_SIDECAR_URL && env.SIGNER_SIDECAR_SECRET) {
+  if (env.SIGNER_SIDECAR_SECRET) {
     try {
       const health = await sidecarHealth(env);
       sidecar = { configured: true, reachable: true, address: health.address };

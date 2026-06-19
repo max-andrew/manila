@@ -26,7 +26,20 @@
     }
   ],
   "observability": { "enabled": true },
-  // Autowake: ping the signer sidecar every 5 min so it never goes cold between
-  // demos (handler in src/index.ts). Cron Triggers are free-tier.
-  "triggers": { "crons": ["*/5 * * * *"] }
+  // The Dynamic MPC signer runs as a Container (native binary can't run in
+  // workerd), fronted by the SIGNER Durable Object. Single instance — the MPC
+  // session isn't concurrency-safe. basic = 1 GiB (256 MiB risks OOM with the
+  // SDK). Scales to zero (sleepAfter in signer-container.ts); woken on demand.
+  "containers": [
+    {
+      "class_name": "SignerContainer",
+      "image": "./Dockerfile",
+      "instance_type": "basic",
+      "max_instances": 1
+    }
+  ],
+  "durable_objects": {
+    "bindings": [{ "name": "SIGNER", "class_name": "SignerContainer" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["SignerContainer"] }]
 }
