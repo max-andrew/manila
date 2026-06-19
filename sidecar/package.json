@@ -1,0 +1,8 @@
+{
+  "name": "manila-sidecar",
+  "private": true,
+  "description": "Standalone deps for the Manila signing sidecar container — only the Dynamic MPC SDK; keeps the emulated amd64 image build small.",
+  "dependencies": {
+    "@dynamic-labs-wallet/node-evm": "1.0.38"
+  }
+}

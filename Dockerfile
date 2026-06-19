@@ -11,17 +11,18 @@ RUN apt-get update \
 
 WORKDIR /app
 
-# Install production deps only. npm ci resolves @dynamic-labs-wallet/node-evm's
-# linux/amd64 native binary here.
-COPY package.json package-lock.json ./
-RUN npm ci --omit=dev --no-audit --no-fund
+# Install ONLY the sidecar's single dependency (the Dynamic MPC SDK), via its own
+# minimal manifest — not the whole Worker dependency tree. This keeps the
+# emulated amd64 build small and fast.
+COPY sidecar/package.json ./package.json
+RUN npm install --omit=dev --no-audit --no-fund
 
 # The sidecar is self-contained (imports only the Dynamic SDK + node builtins).
-COPY sidecar ./sidecar
+COPY sidecar/server.mjs ./server.mjs
 
 # Pinned to the container's defaultPort (see signer-container.ts); also passed
 # via envVars at start, this is the in-image default.
 ENV PORT=8080
 EXPOSE 8080
 
-CMD ["node", "sidecar/server.mjs"]
+CMD ["node", "server.mjs"]
