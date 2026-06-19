@@ -7,20 +7,27 @@ run it and a walkthrough of what each part does.
 
 ## Run it
 
-The deployed app is live at **https://manila.maxwellandrew.com** — the agent,
-policy engine, maker-checker approvals, live balances, vesting display, and audit
-export all run there.
+The deployed app is live at **https://manila.maxwellandrew.com** and runs
+entirely on Cloudflare — the agent, policy engine, maker-checker approvals, live
+balances, vesting display, audit export, *and* live on-chain signing (sealing
+salaries, releasing equity).
 
-Live on-chain signing (sealing salaries, releasing equity) is performed by a
-Dynamic **MPC server wallet** that runs in a small Node sidecar — the Dynamic SDK
-ships a native binary that can't run inside Cloudflare Workers. To exercise the
-signing paths against the deployed app, run the sidecar and point the Worker at
-it:
+The Dynamic **MPC server wallet** signs from a **Cloudflare Container** the Worker
+calls through a Durable Object binding — the Dynamic SDK ships a native binary
+that can't run inside a Worker, and the container is the minimal real-OS process
+that can. There's nothing to stand up separately; it scales to zero, so the first
+signing action after it's been idle cold-starts it (~15s) and it stays warm while
+you use the app.
+
+To post a fresh equity price to the on-chain oracle:
 
 ```sh
-bash scripts/live-signer.sh     # starts the signing sidecar + a tunnel, points the deployed Worker at it
-node scripts/oracle-push.mjs   # posts the latest AAPL/USD price to the on-chain oracle
+node scripts/oracle-push.mjs   # posts the latest AAPL/USD price to the oracle
 ```
+
+Redeploying the signer container needs Docker running locally (`wrangler deploy`
+builds its amd64 image; on Apple Silicon, turn on Docker's Rosetta option so the
+build is fast).
 
 Reset to a clean state any time with **↺ Reset demo** in the footer (time-aware —
 it re-opens today's run without deleting history).
@@ -83,10 +90,10 @@ the employer.
 - **Two-leg payments.** A salary run has a sealed value leg (Unlink) and a metered
   nanopayment leg (x402 → Circle Gateway). The per-call nanopayment is the
   agent-to-service economy pattern, and the platform-fee rail.
-- **Keyless agent.** Signing runs in the Dynamic SDK's native MPC binary, so it
-  lives in a Node sidecar the Worker calls over an authenticated channel; the
-  Worker never holds key material. In production the sidecar runs on a small
-  always-on host rather than a laptop.
+- **Keyless agent.** Signing runs in the Dynamic SDK's native MPC binary, which
+  can't load in a Worker — so it runs in a Cloudflare Container the Worker calls
+  through a Durable Object binding; the Worker never holds key material. Same
+  platform, one `wrangler deploy`, no tunnel or separate host.
 - **Oracle by interface, not address.** The vault consumes `IPyth`; on Arc we
   supply a relay implementing it. Pointing at a canonical Pyth deployment is a
   constructor address change, no code edits.

@@ -6,7 +6,7 @@ For a century, salaries were private because they came in a sealed manila envelo
 
 > Built solo at ETHGlobal New York 2026.
 
-**Live:** [manila.maxwellandrew.com](https://manila.maxwellandrew.com) — the agent, policy engine, maker-checker approval, live treasury balance, and audit export run on the deployed URL. The full on-chain disbursement path (Dynamic-signed, Gateway-batched, Unlink-sealed) runs locally against the signing sidecar; see [Run it](#run-it).
+**Live:** [manila.maxwellandrew.com](https://manila.maxwellandrew.com) — the whole app runs on Cloudflare: the agent, policy engine, maker-checker approval, live treasury balance, audit export, and the full on-chain disbursement path (Dynamic-signed, Gateway-batched, Unlink-sealed). The Dynamic MPC signer runs as a **Cloudflare Container** the Worker calls through a binding (its native binary can't load in a Worker); see [Run it](#run-it).
 
 A real agent-driven payroll run has settled on Arc testnet — three salaries sealed as private Unlink transfers, e.g. tx [`0x1e76d25d…b15f4c`](https://testnet.arcscan.app/tx/0x1e76d25d2ceb8900649b1b30fe7e8bb99ca7dc6b20e840707501a905c5b15f4c) (amount and counterparty unreadable on the explorer — that's the point).
 
@@ -37,7 +37,7 @@ This is only safe to leave unattended *because* the controls are deterministic: 
 
 Each integration is load-bearing — remove it and the product stops working, not just loses a feature.
 
-- **Dynamic** (Best Agentic Build, Best Money App, joint Private Nanopayments) — a Dynamic server wallet (MPC) is the treasury and the agent's signer. It lives in a Node sidecar (`sidecar/server.mjs`; the SDK's native MPC binary can't run in workerd) and signs every Gateway payment authorization over an authenticated channel (`src/lib/signer.ts`). The agent decides and executes, but holds no key material — the wallet signs on its behalf under the maker-checker controls.
+- **Dynamic** (Best Agentic Build, Best Money App, joint Private Nanopayments) — a Dynamic server wallet (MPC) is the treasury and the agent's signer. The SDK's signing runs in a native binary that can't load in workerd, so it runs in a **Cloudflare Container** (`sidecar/server.mjs`, `src/signer-container.ts`) that the Worker reaches through a Durable Object binding (`src/lib/signer.ts`) — same platform, no tunnel. It signs every Gateway payment authorization; the agent decides and executes, but holds no key material — the 2-of-2 wallet signs on its behalf under the maker-checker controls.
 - **Unlink** (joint Private Nanopayments) — every salary is sealed: each disbursement is an Unlink private transfer, so amounts and counterparties are unreadable on ArcScan (`src/lib/unlink.ts`, `src/routes/seal.ts`). This is the product's whole reason to exist; without it, payroll is public.
 - **Circle Gateway + Arc** (Best Agentic Economy, joint Private Nanopayments) — disbursements are metered as x402 nanopayments and netted by Circle Gateway into one batched, gas-free settlement on Arc testnet (`src/routes/seal.ts`, `src/routes/disburse.ts`). The agent paying per-call for each sealed disbursement is exactly the agent-to-service commerce pattern the Agentic Economy track is for.
 
@@ -50,7 +50,7 @@ The second rail is **equity that pays in cash**: [`PayrollVaultV3`](contracts/RE
 </p>
 
 - **Oracle.** The vault reads the standard Pyth `IPyth` interface. On Arc we provide [`PythPriceRelay`](contracts/src/PythPriceRelay.sol) — fed the real **AAPL/USD** price from Pyth's free [Hermes](https://hermes.pyth.network) feed (`scripts/oracle-push.mjs`) — so it's a drop-in for canonical Pyth (an address swap, no code change). The release payout literally tracks Apple's share price; raise the oracle and the same vested shares pay more USDC.
-- **Agent-operated.** The Dynamic server wallet is the vault's `releaser`; the agent releases (and re-arms) tranches on command, signed in the sidecar — every release a real, publicly verifiable USDC transfer on Arc, logged to the same audit trail.
+- **Agent-operated.** The Dynamic server wallet is the vault's `releaser`; the agent releases (and re-arms) tranches on command, signed in the container — every release a real, publicly verifiable USDC transfer on Arc, logged to the same audit trail.
 - **Deployed:** vault [`0x021Bf03C…B06b`](https://testnet.arcscan.app/address/0x021Bf03C10ed7d8205aaD4dE6D3847D94715B06b), oracle relay [`0xb8e18484…3424`](https://testnet.arcscan.app/address/0xb8e18484bebC0356A67293590B8affE2b55e3424).
 
 ## Roadmap
@@ -101,8 +101,9 @@ To exercise the live money path (real Arc testnet settlement), add sponsor crede
 cp .dev.vars.example .dev.vars     # DYNAMIC_API_KEY/ENV_ID, UNLINK_API_KEY, SEAL_FEE_ADDRESS,
                                    # SIGNER_SIDECAR_SECRET + SIDECAR_WALLET_PASSWORD (any random strings)
 
-# 1. Treasury wallet — the Dynamic MPC server wallet, in its Node sidecar.
+# 1. Treasury wallet — provision the Dynamic MPC server wallet and print its address.
 node sidecar/server.mjs            # prints the treasury address; copy it into .dev.vars as TREASURY_WALLET_ADDRESS
+                                   # (the same server.mjs runs as a Cloudflare Container in production — see Known limitations)
 
 # 2. Private accounts — treasury + employees on Unlink.
 node scripts/setup-unlink.mjs      # registers the accounts, faucets the treasury's private balance,
@@ -136,7 +137,7 @@ Once green, "Run today's payroll" seals three real private transfers on Arc, set
 
 ## Known limitations
 
-- The Dynamic MPC signer runs in a Node sidecar (`sidecar/server.mjs`) because the SDK ships a native binary that can't load in Cloudflare Workers. The deployed Worker reaches it over an authenticated channel; for judging, the live on-chain path runs locally (or with the sidecar tunnelled) while read endpoints and the agent run fully on the edge.
+- The Dynamic MPC signer runs as a **Cloudflare Container** (`sidecar/server.mjs`, `src/signer-container.ts`) because the SDK ships a native binary that can't load in a Worker. The Worker reaches it through a Durable Object binding, so the entire app — including the live on-chain signing path — runs on Cloudflare with no tunnel or separate host. The container scales to zero and wakes on demand (a ~15s cold start after idle, then warm while in use). Deploying it needs Docker running locally, since `wrangler deploy` builds the amd64 image; on Apple Silicon, enable Docker's Rosetta option so that build is fast.
 - The agent runs on the best free function-calling model on Workers AI (Llama 3.3 70B). It reliably parses intent and drafts; the policy gate and execute/approve branch are deterministic on purpose, so model variance can't affect correctness or bypass a control.
 - On arc-testnet the sealed token is a mock USDC (`USDCm`) from Unlink's faucet, not native USDC (see Privacy model).
 - Demo amounts are dollars, not thousands, because the Arc faucet grants 20 USDC per address per 2h — every transaction is real testnet value.

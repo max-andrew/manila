@@ -20,8 +20,8 @@ flowchart TB
     Audit[("Audit log → CSV")]
   end
 
-  Sidecar["Signing sidecar (Node)<br/><b>Dynamic</b> MPC 2-of-2 server wallet"]
-  Sidecar -. signs, agent holds no keys .-> Agent
+  Sidecar["<b>Dynamic</b> MPC signer — Cloudflare Container<br/>2-of-2 server wallet (native binary, off-Worker)"]
+  Sidecar -. signs via DO binding; agent holds no keys .-> Agent
 
   subgraph Salary["Rail 1 — sealed daily salary (private)"]
     Seal["Seal service<br/>x402-protected, per employee"]
@@ -62,7 +62,7 @@ sequenceDiagram
   participant H as Pyth Hermes (free)
   participant R as PythPriceRelay (Arc)
   participant A as Agent (Worker)
-  participant S as Dynamic sidecar
+  participant S as Dynamic signer (Container)
   participant V as PayrollVaultV3 (Arc)
   participant B as Employee wallet
 

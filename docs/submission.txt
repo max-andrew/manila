@@ -14,8 +14,8 @@ PRIZES & WHY APPLICABLE
 - Best Private Nanopayments (joint, Dynamic x Unlink x Arc) — Dynamic is the wallet layer: it creates the server wallet and signs every private nanopayment authorization that Gateway then batches and Unlink seals.
 
 CODE LINK (clearest example)
-The server wallet signs each transaction the agent broadcasts (the agent never holds a key): https://github.com/max-andrew/manila/blob/main/sidecar/server.mjs#L136
-Stateless MPC wallet creation, backed up to Dynamic: https://github.com/max-andrew/manila/blob/main/sidecar/server.mjs#L80
+The server wallet signs each transaction the agent broadcasts (the agent never holds a key): https://github.com/max-andrew/manila/blob/main/sidecar/server.mjs#L141
+Stateless MPC wallet creation, backed up to Dynamic: https://github.com/max-andrew/manila/blob/main/sidecar/server.mjs#L82
 
 API EASE OF USE: 7/10
 Clean api-token + environment-id flow, and signTypedData accepting arbitrary EIP-712 is what let one wallet sign Circle's x402 batch authorizations — that composability is why the project works. Docked for the native-binary runtime constraint (below).
