@@ -9,3 +9,5 @@ scripts/.unlink-accounts.json
 scripts/.gateway-test.json
 
 scripts/.gateway-ops.json
+
+scratch.txt
